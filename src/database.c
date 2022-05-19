@@ -30,8 +30,13 @@
  * \brief Runtime code for hs_database manipulation.
   */
 
+#ifndef __KERNEL__
 #include <stdio.h>
 #include <string.h>
+#else
+#include <linux/kernel.h>
+#include <linux/string.h>
+#endif
 
 #include "allocator.h"
 #include "hs_common.h"

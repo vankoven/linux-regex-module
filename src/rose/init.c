@@ -39,7 +39,11 @@
 #include "nfa/nfa_internal.h"
 #include "util/multibit.h"
 
+#ifndef __KERNEL__
 #include <string.h>
+#else
+#include <linux/string.h>
+#endif
 
 static really_inline
 void init_rstate(const struct RoseEngine *t, char *state) {

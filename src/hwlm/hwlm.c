@@ -39,7 +39,11 @@
 #include "nfa/shufti.h"
 #include "nfa/truffle.h"
 #include "nfa/vermicelli.h"
+#ifndef __KERNEL__
 #include <string.h>
+#else
+#include <linux/string.h>
+#endif
 
 #define MIN_ACCEL_LEN_BLOCK  16
 #define MIN_ACCEL_LEN_STREAM 16

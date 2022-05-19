@@ -27,7 +27,11 @@
  */
 
 #include "util/join.h"
+#ifndef __KERNEL__
 #include <string.h>
+#else
+#include <linux/string.h>
+#endif
 
 /** \file
   * \brief Limex Execution Engine Or:

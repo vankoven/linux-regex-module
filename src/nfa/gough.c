@@ -39,7 +39,11 @@
 #include "util/simd_utils.h"
 #include "util/unaligned.h"
 #include "ue2common.h"
+#ifndef __KERNEL__
 #include <string.h>
+#else
+#include <linux/string.h>
+#endif
 
 #include "mcclellan_common_impl.h"
 

@@ -33,7 +33,11 @@
 #ifndef STREAM_COMPRESS_H
 #define STREAM_COMPRESS_H
 
+#ifndef __KERNEL__
 #include <stdlib.h>
+#else
+#include <linux/types.h>
+#endif
 
 struct hs_stream;
 struct RoseEngine;

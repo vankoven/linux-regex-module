@@ -33,7 +33,11 @@
 #include "util/join.h"
 #include "util/partial_store.h"
 #include "util/state_compress.h"
+#ifndef __KERNEL__
 #include <string.h>
+#else
+#include <linux/string.h>
+#endif
 
 #if !defined(SIZE) || !defined(STATE_T) || !defined(LOAD_FROM_ENG)
 #  error Must define SIZE, STATE_T, LOAD_FROM_ENG in includer.
