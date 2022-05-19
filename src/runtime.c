@@ -30,8 +30,13 @@
  * \brief Runtime functions.
  */
 
+#ifndef __KERNEL__
 #include <stdlib.h>
 #include <string.h>
+#else
+#include <linux/types.h>
+#include <linux/string.h>
+#endif
 
 #include "allocator.h"
 #include "hs_compile.h" /* for HS_MODE_* flags */

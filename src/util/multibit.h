@@ -57,7 +57,11 @@
 #include "unaligned.h"
 #include "multibit_internal.h"
 
+#ifndef __KERNEL__
 #include <string.h>
+#else
+#include <linux/string.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {

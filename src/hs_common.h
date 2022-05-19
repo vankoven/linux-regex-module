@@ -34,7 +34,11 @@
 #else
 #define HS_CDECL
 #endif
+#ifndef __KERNEL__
 #include <stdlib.h>
+#else
+#include <linux/types.h>
+#endif
 
 /**
  * @file

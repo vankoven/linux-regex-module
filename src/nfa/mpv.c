@@ -42,7 +42,11 @@
 #include "util/simd_utils.h"
 #include "util/unaligned.h"
 
+#ifndef __KERNEL__
 #include <string.h>
+#else
+#include <linux/string.h>
+#endif
 
 #define MIN_SKIP_REPEAT 32
 

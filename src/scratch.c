@@ -30,8 +30,13 @@
  * \brief Functions for allocating and manipulating scratch space.
  */
 
+#ifndef __KERNEL__
 #include <stdlib.h>
 #include <string.h>
+#else
+#include <linux/types.h>
+#include <linux/string.h>
+#endif
 
 #include "allocator.h"
 #include "hs_internal.h"

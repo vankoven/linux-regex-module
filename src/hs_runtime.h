@@ -29,7 +29,11 @@
 #ifndef HS_RUNTIME_H_
 #define HS_RUNTIME_H_
 
+#ifndef __KERNEL__
 #include <stdlib.h>
+#else
+#include <linux/types.h>
+#endif
 
 /**
  * @file

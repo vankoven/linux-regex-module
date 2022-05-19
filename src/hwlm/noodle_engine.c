@@ -43,9 +43,14 @@
 #include "util/partial_store.h"
 #include "util/simd_utils.h"
 
+#ifndef __KERNEL__
 #include <ctype.h>
 #include <stdbool.h>
 #include <string.h>
+#else
+#include <linux/types.h>
+#include <linux/string.h>
+#endif
 
 /** \brief Noodle runtime context. */
 struct cb_info {

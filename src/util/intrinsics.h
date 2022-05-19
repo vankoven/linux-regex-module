@@ -56,6 +56,9 @@
 #endif
 
 #if defined(USE_X86INTRIN_H)
+#ifdef __KERNEL__
+#define  _MM_MALLOC_H_INCLUDED
+#endif
 #include <x86intrin.h>
 #elif defined(USE_INTRIN_H)
 #include <intrin.h>
