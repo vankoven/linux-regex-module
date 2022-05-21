@@ -66,7 +66,7 @@ hs_error_t HS_CDECL hs_free_database(hs_database_t *db) {
 HS_PUBLIC_API
 hs_error_t HS_CDECL hs_serialize_database(const hs_database_t *db, char **bytes,
                                           size_t *serialized_length) {
-    if (!db || !bytes || !serialized_length) {
+    if (!db || !bytes || (!serialized_length && !*bytes)) {
         return HS_INVALID;
     }
 
@@ -80,12 +80,17 @@ hs_error_t HS_CDECL hs_serialize_database(const hs_database_t *db, char **bytes,
     }
 
     size_t length = sizeof(struct hs_database) + db->length;
+    char *out;
 
-    char *out = hs_misc_alloc(length);
-    ret = hs_check_alloc(out);
-    if (ret != HS_SUCCESS) {
-        hs_misc_free(out);
-        return ret;
+    if (serialized_length) {
+        out = hs_misc_alloc(length);
+        ret = hs_check_alloc(out);
+        if (ret != HS_SUCCESS) {
+            hs_misc_free(out);
+            return ret;
+        }
+    } else {
+        out = *bytes;
     }
 
     memset(out, 0, length);
@@ -109,8 +114,10 @@ hs_error_t HS_CDECL hs_serialize_database(const hs_database_t *db, char **bytes,
     const char *bytecode = hs_get_bytecode(db);
     memcpy(buf, bytecode, db->length);
 
-    *bytes = out;
-    *serialized_length = length;
+    if (serialized_length) {
+        *bytes = out;
+        *serialized_length = length;
+    }
     return HS_SUCCESS;
 }
 
