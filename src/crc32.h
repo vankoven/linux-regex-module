@@ -31,6 +31,8 @@
 
 #include "ue2common.h"
 
+#ifndef __KERNEL__
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -40,6 +42,16 @@ u32 Crc32c_ComputeBuf(u32 inCrc32, const void *buf, size_t bufLen);
 
 #ifdef __cplusplus
 }
+#endif
+
+#else /* __KERNEL */
+
+#include <linux/crc32.h>
+
+static inline u32 Crc32c_ComputeBuf(u32 inCrc32, const void *buf, size_t bufLen) {
+    return __crc32c_le(inCrc32, (unsigned char const*) buf, bufLen);
+}
+
 #endif
 
 #endif /* CRC32_H_36A5015B5840C1 */

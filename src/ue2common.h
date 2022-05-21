@@ -38,6 +38,8 @@
 
 #include "config.h"
 
+#ifndef __KERNEL__
+
 /* standard types used across ue2 */
 
 // We use the size_t type all over the place, usually defined in stddef.h.
@@ -227,5 +229,9 @@ typedef u32 ReportID;
 #endif
 
 #include <assert.h>
+
+#else
+#include "ue2common_kern.h"
+#endif
 
 #endif
