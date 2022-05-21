@@ -42,27 +42,27 @@ void printMatch(const struct core_info *ci, u64a start, u64a end) {
     assert(start <= end);
     assert(end <= ci->buf_offset + ci->len);
 
-    printf("'");
+    DEBUG_PRINTF("'");
     u64a i = start;
     for (; i <= MIN(ci->buf_offset, end); i++) {
         u64a h_idx = ci->buf_offset - i;
         u8 c = h_idx >= ci->hlen ? '?' : ci->hbuf[ci->hlen - h_idx - 1];
         if (ourisprint(c) && c != '\'') {
-            printf("%c", c);
+            DEBUG_PRINTF("%c", c);
         } else {
-            printf("\\x%02x", c);
+            DEBUG_PRINTF("\\x%02x", c);
         }
     }
     for (; i <= end; i++) {
         u64a b_idx = i - ci->buf_offset - 1;
         u8 c = b_idx >= ci->len ? '?' : ci->buf[b_idx];
         if (ourisprint(c) && c != '\'') {
-            printf("%c", c);
+            DEBUG_PRINTF("%c", c);
         } else {
-            printf("\\x%02x", c);
+            DEBUG_PRINTF("\\x%02x", c);
         }
     }
-    printf("'");
+    DEBUG_PRINTF("'");
 }
 #endif
 
@@ -79,7 +79,7 @@ hwlmcb_rv_t roseDelayRebuildCallback(size_t end, u32 id,
     DEBUG_PRINTF("REBUILD MATCH id=%u end offset@%llu]: ", id, real_end);
     u64a start = real_end < 8 ? 1 : real_end - 7;
     printMatch(ci, start, real_end);
-    printf("\n");
+    DEBUG_PRINTF("\n");
 #endif
 
     DEBUG_PRINTF("STATE groups=0x%016llx\n", tctx->groups);
