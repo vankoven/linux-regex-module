@@ -1098,12 +1098,12 @@ void dumpData(const char *data, size_t len) {
     for (size_t i = 0; i < len; i++) {
         u8 c = data[i];
         if (ourisprint(c) && c != '\'') {
-            printf("%c", c);
+            DEBUG_PRINTF("%c", c);
         } else {
-            printf("\\x%02x", c);
+            DEBUG_PRINTF("\\x%02x", c);
         }
     }
-    printf("\n");
+    DEBUG_PRINTF("\n");
 }
 #endif
 

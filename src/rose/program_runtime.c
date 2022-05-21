@@ -779,6 +779,7 @@ int roseCheckMask32(const struct core_info *ci, const u8 *and_mask,
             }
             c_len = ci->len - offset;
             c_shift = 32 - c_len;
+            assert(c_len <= 32);
             copy_upto_64_bytes((u8 *)&data, ci->buf + offset, c_len);
         } else {
             data = loadu256(ci->buf + offset);
@@ -921,6 +922,7 @@ u64a getBufferDataComplex(const struct core_info *ci, const s64a loc,
             }
             c_len = ci->len - loc;
             c_shift = data_len - c_len;
+            assert(c_len <= data_len);
             copy_upto_64_bytes(data, ci->buf + loc, c_len);
         } else {
 #ifdef HAVE_AVX512
