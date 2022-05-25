@@ -31,9 +31,10 @@ struct rex_item {
 
 	atomic_t bytes_scanned;
 	atomic_t use_count;
+	atomic_t hit_count;
 
 	hs_database_t __rcu *database;
-	hs_scratch_t __rcu *__percpu *scratch;
+	void __rcu __percpu *scratch;
 };
 
 DEFINE_IDR(rex_item_idr);
@@ -55,21 +56,26 @@ int xdp_rex_match(u32 rex_id, const void *haystack, u32 len)
 
 	rcu_read_lock();
 
-	if (!likely(rex = idr_find(&rex_item_idr, rex_id)))
+	if (!likely(rex = idr_find(&rex_item_idr, rex_id))) {
+		rcu_read_unlock();
 		return -EBADF;
+	}
 
 	db = rcu_dereference(rex->database);
-	scratch = *this_cpu_ptr(rcu_dereference(rex->scratch));
+	scratch = this_cpu_ptr(rcu_dereference(rex->scratch));
 
 	if (likely(db)) {
-	    pr_debug("hs_scan %u bytes\n", len);
-	    atomic_add(len, &rex->bytes_scanned);
-	    atomic_inc(&rex->use_count);
+		pr_debug("hs_scan %u bytes\n", len);
+		// atomic_add(len, &rex->bytes_scanned);
+		// atomic_inc(&rex->use_count);
 
-	    kernel_fpu_begin();
-	    hs_scan(db, haystack, len, 0, scratch,
-		    rex_match_handler, &match);
-	    kernel_fpu_end();
+		kernel_fpu_begin();
+		hs_scan(db, haystack, len, 0, scratch,
+			rex_match_handler, &match);
+		kernel_fpu_end();
+
+		// if (match != -ESRCH)
+		// 	atomic_inc(&rex->hit_count);
 	}
 
 	rcu_read_unlock();
@@ -113,19 +119,12 @@ static ssize_t rex_database_read(struct config_item *cfg,
 static void rex_database_reset(struct rex_item *rex, hs_database_t __rcu *db,
 			       hs_scratch_t __rcu *__percpu *scratch)
 {
-	int cpu;
-
 	db = xchg(&rex->database, db);
 	scratch = xchg(&rex->scratch, scratch);
 
 	synchronize_rcu();
 
-	if (scratch) {
-	    for_each_possible_cpu(cpu)
-		    hs_free_scratch(*per_cpu_ptr(scratch, cpu));
-	    free_percpu(scratch);
-	}
-
+	free_percpu(scratch);
 	hs_free_database(db);
 }
 
@@ -133,10 +132,10 @@ static ssize_t rex_database_write(struct config_item *cfg,
 				  const void *data, size_t size)
 {
 	struct rex_item *rex = container_of(cfg, struct rex_item, cfg);
-
 	hs_database_t *database = NULL;
 	hs_scratch_t *proto = NULL;
-	hs_scratch_t *__percpu *scratch;
+	void __percpu *scratch;
+	size_t scratch_size;
 	int cpu;
 
 	if (hs_deserialize_database(data, size, &database) != HS_SUCCESS)
@@ -147,26 +146,18 @@ static ssize_t rex_database_write(struct config_item *cfg,
 		return -ENOMEM;
 	}
 
-	scratch = alloc_percpu(hs_scratch_t*);
+	BUG_ON(hs_scratch_size(proto, &scratch_size) != HS_SUCCESS);
+	scratch = __alloc_percpu(scratch_size, 64);
 	if (!scratch) {
 		hs_free_database(database);
 		return -ENOMEM;
 	}
 
 	for_each_possible_cpu(cpu) {
-		hs_scratch_t **dst = per_cpu_ptr(scratch, cpu);
-		if (hs_clone_scratch(proto, dst) != HS_SUCCESS)
-			break;
+		hs_scratch_t *dst = per_cpu_ptr(scratch, cpu);
+		BUG_ON(hs_init_scratch(proto, dst) != HS_SUCCESS);
 	}
 	hs_free_scratch(proto);
-
-	if (cpu < nr_cpu_ids) {
-		for_each_possible_cpu(cpu)
-			hs_free_scratch(*per_cpu_ptr(scratch, cpu));
-		free_percpu(scratch);
-		hs_free_database(database);
-		return -ENOMEM;
-	}
 
 	rex_database_reset(rex, database, scratch);
 	return size;
@@ -183,7 +174,7 @@ static ssize_t rex_info_show(struct config_item *cfg, char *str)
 	rcu_read_lock();
 
 	db = rcu_dereference(rex->database);
-	s = *this_cpu_ptr(rcu_dereference(rex->scratch));
+	s = this_cpu_ptr(rcu_dereference(rex->scratch));
 
 	if (hs_database_info(rex->database, &info) != HS_SUCCESS) {
 		rcu_read_unlock();
@@ -304,7 +295,7 @@ static struct configfs_subsystem rex_configfs = {
 static void print_banner(void)
 {
 	pr_info("Hyperscan %s", hs_version());
-	pr_info("CPU: ");
+	pr_info("CPU:");
 #ifdef HAVE_SSE2
 	pr_cont(" sse2");
 #endif
