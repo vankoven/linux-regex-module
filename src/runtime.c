@@ -418,8 +418,6 @@ hs_error_t HS_CDECL hs_scan(const hs_database_t *db, const char *data,
     }
 
     switch (rose->runtimeImpl) {
-    default:
-        assert(0);
     case ROSE_RUNTIME_FULL_ROSE:
         rawBlockExec(rose, scratch);
         break;
@@ -429,6 +427,8 @@ hs_error_t HS_CDECL hs_scan(const hs_database_t *db, const char *data,
     case ROSE_RUNTIME_SINGLE_OUTFIX:
         soleOutfixBlockExec(rose, scratch);
         break;
+    default:
+        assert(0);
     }
 
 done_scan:
@@ -685,14 +685,14 @@ void report_eod_matches(hs_stream_t *id, hs_scratch_t *scratch,
         if (rose->requiresEodCheck) {
             switch (rose->runtimeImpl) {
             default:
-            case ROSE_RUNTIME_PURE_LITERAL:
-                assert(0);
             case ROSE_RUNTIME_FULL_ROSE:
                 rawEodExec(id, scratch);
                 break;
             case ROSE_RUNTIME_SINGLE_OUTFIX:
                 soleOutfixEodExec(id, scratch);
                 break;
+            case ROSE_RUNTIME_PURE_LITERAL:
+                assert(0);
             }
         }
     }
@@ -944,8 +944,6 @@ hs_error_t hs_scan_stream_internal(hs_stream_t *id, const char *data,
     }
 
     switch (rose->runtimeImpl) {
-    default:
-        assert(0);
     case ROSE_RUNTIME_FULL_ROSE:
         rawStreamExec(id, scratch);
         break;
@@ -954,6 +952,9 @@ hs_error_t hs_scan_stream_internal(hs_stream_t *id, const char *data,
         break;
     case ROSE_RUNTIME_SINGLE_OUTFIX:
         soleOutfixStreamExec(id, scratch);
+        break;
+    default:
+        assert(0);
     }
 
     if (rose->hasSom && !told_to_stop_matching(scratch)) {

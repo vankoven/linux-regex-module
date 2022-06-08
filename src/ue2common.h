@@ -47,6 +47,14 @@
 // stdint.h for things like uintptr_t and friends
 #include <stdint.h>
 
+#if defined(__cplusplus)
+# define FALLTHROUGH                    [[fallthrough]]
+#elif !defined(_WIN32) && __has_attribute(__fallthrough__)
+# define FALLTHROUGH                    __attribute__((__fallthrough__))
+#else
+# define FALLTHROUGH                    do {} while (0)  /* fallthrough */
+#endif
+
 /* ick */
 #if defined(_WIN32)
 #define ALIGN_ATTR(x) __declspec(align(x))
