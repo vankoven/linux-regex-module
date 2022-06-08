@@ -1,4 +1,4 @@
-// Copyright 2008, Google Inc.
+// Copyright 2006, Google Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -27,22 +27,28 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-//
-// Google C++ Testing and Mocking Framework (Google Test)
-//
-// Sometimes it's desirable to build Google Test by compiling a single file.
-// This file serves this purpose.
-
-// This line ensures that gtest.h can be compiled on its own, even
-// when it's fused.
+#include <cstdio>
 #include "gtest/gtest.h"
 
-// The following lines pull in the real gtest *.cc files.
-#include "gtest.cc"
-#include "gtest-death-test.cc"
-#include "gtest-filepath.cc"
-#include "gtest-matchers.cc"
-#include "gtest-port.cc"
-#include "gtest-printers.cc"
-#include "gtest-test-part.cc"
-#include "gtest-typed-test.cc"
+#if GTEST_OS_ESP8266 || GTEST_OS_ESP32
+#if GTEST_OS_ESP8266
+extern "C" {
+#endif
+void setup() {
+  testing::InitGoogleTest();
+}
+
+void loop() { RUN_ALL_TESTS(); }
+
+#if GTEST_OS_ESP8266
+}
+#endif
+
+#else
+
+GTEST_API_ int main(int argc, char **argv) {
+  printf("Running main() from %s\n", __FILE__);
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
+#endif
