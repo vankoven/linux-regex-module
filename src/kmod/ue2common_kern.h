@@ -21,6 +21,7 @@
 #include <linux/printk.h>
 
 /* Linux kernel synonyms */
+#define FALLTHROUGH fallthrough
 #define ALIGN_ATTR(x) __aligned(x)
 #define ARRAY_LENGTH(a) ARRAY_SIZE(a)
 #define UNUSED __always_unused
