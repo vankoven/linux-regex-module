@@ -33,6 +33,7 @@
 #ifndef UTIL_ARCH_H_
 #define UTIL_ARCH_H_
 
+#if !defined(__KERNEL__)
 #if defined(__SSE2__) || defined(_M_X64) || (_M_IX86_FP >= 2)
 #define HAVE_SSE2
 #endif
@@ -53,13 +54,14 @@
 #define HAVE_AVX2
 #endif
 
-#if defined(__AVX512BW__)
+#if defined(__AVX512BW__)  && defined(BUILD_AVX512)
 #define HAVE_AVX512
 #endif
 
-#if defined(__AVX512VBMI__)
+#if defined(__AVX512VBMI__) && defined(BUILD_AVX512_VBMI)
 #define HAVE_AVX512VBMI
 #endif
+#endif /* __KERNEL__ */
 
 /*
  * ICC and MSVC don't break out POPCNT or BMI/2 as separate pre-def macros

@@ -19,7 +19,7 @@
 #define DUMP_SUPPORT
 
 /* Define if building "fat" runtime. */
-/* #define FAT_RUNTIME */ /***************/
+/* #undef FAT_RUNTIME */
 
 /* Define if building AVX-512 in the fat runtime. */
 /* #undef BUILD_AVX512 */
@@ -50,39 +50,39 @@
 
 /* Define to 1 if you have the declaration of `pthread_setaffinity_np', and to
    0 if you don't. */
-#define HAVE_DECL_PTHREAD_SETAFFINITY_NP
+/* #undef HAVE_DECL_PTHREAD_SETAFFINITY_NP */
 
 /* #undef HAVE_PTHREAD_NP_H */
 
 /* Define to 1 if you have the `malloc_info' function. */
-#define HAVE_MALLOC_INFO
+/* #undef HAVE_MALLOC_INFO */
 
 /* Define to 1 if you have the `memmem' function. */
 /* #undef HAVE_MEMMEM */
 
 /* Define to 1 if you have a working `mmap' system call. */
-#define HAVE_MMAP
+/* #undef HAVE_MMAP */
 
 /* Define to 1 if `posix_memalign' works. */
-#define HAVE_POSIX_MEMALIGN
+/* #undef HAVE_POSIX_MEMALIGN */
 
 /* Define to 1 if you have the `setrlimit' function. */
-#define HAVE_SETRLIMIT
+/* #undef HAVE_SETRLIMIT */
 
 /* Define to 1 if you have the `shmget' function. */
-#define HAVE_SHMGET
+/* #undef HAVE_SHMGET */
 
 /* Define to 1 if you have the `sigaction' function. */
-#define HAVE_SIGACTION
+/* #undef HAVE_SIGACTION */
 
 /* Define to 1 if you have the `sigaltstack' function. */
-#define HAVE_SIGALTSTACK
+/* #undef HAVE_SIGALTSTACK  */
 
 /* Define if the sqlite3_open_v2 call is available */
 /* #undef HAVE_SQLITE3_OPEN_V2 */
 
 /* Define to 1 if you have the <unistd.h> header file. */
-#define HAVE_UNISTD_H
+/* #undef HAVE_UNISTD_H */
 
 /* Define to 1 if you have the `_aligned_malloc' function. */
 /* #undef HAVE__ALIGNED_MALLOC */

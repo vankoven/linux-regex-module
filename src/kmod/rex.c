@@ -3,25 +3,21 @@
 
 #include "rex.h"
 
+#include "hs_runtime.h"
+
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/configfs.h>
+#include <linux/version.h>
 #include <linux/types.h>
+#include <linux/configfs.h>
 #include <linux/printk.h>
 #include <linux/idr.h>
 #include <linux/cpumask.h>
 #include <linux/mutex.h>
 #include <linux/btf.h>
 #include <linux/btf_ids.h>
-#include <linux/version.h>
 #include <net/xdp.h>
 
-#include "allocator.h"
-#include "hs_runtime.h"
-#include "database.h"
-#include "scratch.h"
-//#include "nfa/nfa_api_queue.h"
-//#include "rose/rose_internal.h"
 
 static ulong max_db_size = 4 << 20;
 module_param(max_db_size, ulong, S_IRUGO | S_IWUSR);
@@ -33,8 +29,15 @@ static DEFINE_MUTEX(rex_config_mutex);
 /** A wrapper around hs_database_t where we may store additional fields. */
 struct rex_database {
 	void __percpu *scratch; /* TODO: make it global */
-	hs_database_t ptr[] __aligned(8);
+	u8 bytes[] __aligned(8);
 };
+
+static inline hs_database_t *patterns(struct rex_database *db)
+{
+	if (!db)
+		return NULL;
+	return (hs_database_t *) db->bytes;
+}
 
 /**
  * struct rex_policy - Represent a configurable hyperscan database.
@@ -52,7 +55,6 @@ struct rex_policy {
 	u32 id;
 	u32 epoch;
 	char *tag;
-	/* override (RW): return a specific result instead of scanning */
 	struct rex_database __rcu *database;
 	struct config_item item;
 };
@@ -105,7 +107,7 @@ int bpf_scan_bytes(const void *buf, __u32 buf__sz,
 	scratch = this_cpu_ptr(db->scratch);
 
 	kernel_fpu_begin();
-	err = hs_scan(db->ptr, buf, buf__sz, 0, scratch,
+	err = hs_scan(patterns(db), buf, buf__sz, 0, scratch,
 		      rex_scan_cb, scan_attr);
 	kernel_fpu_end();
 
@@ -117,7 +119,6 @@ int bpf_scan_bytes(const void *buf, __u32 buf__sz,
 	case HS_SUCCESS:
 		return 0;
 	case HS_SCRATCH_IN_USE:
-		BUG();
 	case HS_INVALID:
 	case HS_UNKNOWN_ERROR:
 	default:
@@ -192,9 +193,16 @@ int bpf_xdp_scan_bytes(struct xdp_md *xdp_md, u32 offset, u32 len,
 }
 EXPORT_SYMBOL(bpf_xdp_scan_bytes);
 
+int bpf_map_test(struct bpf_map *map)
+{
+	return 42;
+}
+EXPORT_SYMBOL(bpf_map_test);
+
 BTF_SET_START(rex_kfunc_ids)
 BTF_ID(func, bpf_scan_bytes)
 BTF_ID(func, bpf_xdp_scan_bytes)
+BTF_ID(func, bpf_map_test)
 BTF_SET_END(rex_kfunc_ids)
 static DEFINE_KFUNC_BTF_ID_SET(&rex_kfunc_ids, rex_kfunc_btf_set);
 
@@ -218,17 +226,17 @@ static ssize_t rexcfg_database_read(struct config_item *item,
 
 	if (!bytes) {
 		/* In first call return size for te buffer. */
-		if (!db || hs_database_size(db->ptr, &ret))
+		if (!hs_database_size(patterns(db), &ret))
 			ret = 0;
 	} else if (size > 0) {
 		/* In second call fill the buffer with data.
 		   We have to check size again to avoid races. */
-		if (!db || hs_database_size(db->ptr, &ret) || ret != size) {
+		if (hs_database_size(patterns(db), &ret) || ret != size) {
 			ret = -ETXTBSY;
 			goto out;
 		}
 
-		if (hs_serialize_database(db->ptr, &bytes, NULL)) {
+		if (hs_serialize_database(patterns(db), &bytes, NULL)) {
 			WARN(1, KERN_ERR "hs_serialize_database() failed\n");
 			ret = -EIO;
 		}
@@ -281,12 +289,12 @@ static ssize_t rexcfg_database_write(struct config_item *item,
 	if (!db)
 		return -ENOMEM;
 
-	if (hs_deserialize_database_at(bytes, nbytes, db->ptr)) {
+	if (hs_deserialize_database_at(bytes, nbytes, patterns(db))) {
 		kfree(db);
 		return -EINVAL;
 	}
 
-	if (hs_alloc_scratch(db->ptr, &proto)) {
+	if (hs_alloc_scratch(patterns(db), &proto)) {
 		kfree(db);
 		return -ENOMEM;
 	}
@@ -322,13 +330,13 @@ static ssize_t rexcfg_info_show(struct config_item *item, char *str)
 	rcu_read_lock();
 
 	db = rcu_dereference(rex->database);
-	if (!db || hs_database_info(db->ptr, &info)) {
+	if (hs_database_info(patterns(db), &info)) {
 		ret = -EIO;
 		goto out;
 	}
 
 	ret += sysfs_emit_at(str, ret, "%s\n", info);
-	hs_misc_free(info);
+	kfree(info);
 
 out:
 	rcu_read_unlock();
@@ -468,31 +476,6 @@ static struct configfs_subsystem rex_configfs = {
 static void print_banner(void)
 {
 	pr_info("Hyperscan %s", hs_version());
-	pr_info("CPU:");
-#ifdef HAVE_SSE2
-	pr_cont(" sse2");
-#endif
-#ifdef HAVE_SSE41
-	pr_cont(" sse41");
-#endif
-#ifdef HAVE_SSE42
-	pr_cont(" sse42");
-#endif
-#ifdef HAVE_AVX
-	pr_cont(" avx");
-#endif
-#ifdef HAVE_AVX2
-	pr_cont(" avx2");
-#endif
-#ifdef HAVE_AVX512
-	pr_cont(" avx512");
-#endif
-#ifdef HAVE_AVX512VBMI
-	pr_cont(" avx512_vbmi");
-#endif
-#ifdef HAVE_POPCOUNT_INSTR
-	pr_cont(" popcount");
-#endif
 	pr_cont("\n");
 }
 
@@ -519,7 +502,6 @@ static void __exit rex_exit(void)
 	configfs_unregister_subsystem(&rex_configfs);
 	WARN_ON(!idr_is_empty(&rex_idr));
 	idr_destroy(&rex_idr);
-	pr_info("xdp_rex_exit\n");
 }
 
 module_init(rex_init);
