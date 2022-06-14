@@ -11,14 +11,8 @@
 extern "C" {
 #endif
 
-enum {
-	REX_SINGLE_SHOT		= 1 << 0,
-	/* REX_RECORD_MATCH	= 1 << 1, */
-	/* return packet offsets? */
-};
-
 /**
-   Structure used to store match events.
+  * Structure describing a match event.
   */
 struct rex_event {
 	unsigned expression;
@@ -27,8 +21,13 @@ struct rex_event {
 	unsigned long long flags;
 };
 
+/* handler_flags */
+enum {
+	REX_SINGLE_SHOT		= 1 << 0,
+};
+
 /**
- * struct rex_scan_attr - Attributes for bpf_scan_bytes() and bpf_xdp_scan_bytes().
+ * Attributes for bpf_scan_bytes() and bpf_xdp_scan_bytes().
  *
  * @database_id:	Numeric database handle taken from configfs (in).
  * @handler_flags:	Customize match handler behaviour (in).
@@ -38,7 +37,7 @@ struct rex_event {
 struct rex_scan_attr {
 	__u32 database_id;
 	__u32 handler_flags;
-	__u32 event_count;
+	__u32 nr_events;
 	struct rex_event last_event;
 };
 

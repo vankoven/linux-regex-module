@@ -73,6 +73,40 @@ else()
 target_link_libraries(unit-hyperscan hs expressionutil)
 endif()
 
+if (TEST_XDPSCAN)
+
+set(unit_xdpscan_SOURCES
+    ${gtest_SOURCES}
+    hyperscan/test_util.cpp
+    hyperscan/extparam.cpp
+    hyperscan/arg_checks.cpp
+    hyperscan/behaviour.cpp
+    hyperscan/identical.cpp
+    hyperscan/literals.cpp
+    hyperscan/logical_combination.cpp
+    hyperscan/multi.cpp
+    hyperscan/single.cpp
+    hyperscan/order.cpp
+    hyperscan/xdp_scan.cpp
+    hyperscan/xdp_runner.c
+    )
+add_executable(unit-xdpscan ${unit_xdpscan_SOURCES})
+target_link_options(unit-xdpscan PRIVATE -Wl,--wrap=hs_scan)
+
+if (BUILD_STATIC_AND_SHARED OR BUILD_SHARED_LIBS)
+target_link_libraries(unit-xdpscan hs_shared expressionutil bpf)
+else()
+#target_link_libraries(unit-xdpscan hs expressionutil bpf)
+target_include_directories(unit-xdpscan PRIVATE
+    /home/sergio/gcore/xdp-progs/libbpf/include/
+    )
+target_link_options(unit-xdpscan PRIVATE -static)
+target_link_libraries(unit-xdpscan hs expressionutil
+    /home/sergio/gcore/xdp-progs/build/external/usr/lib64/libbpf.a elf z
+    )
+endif()
+
+endif()
 
 if (NOT (RELEASE_BUILD OR FAT_RUNTIME))
 set(unit_internal_SOURCES
