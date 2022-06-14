@@ -1,295 +1,468 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+#include "rex.h"
+
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/configfs.h>
 #include <linux/types.h>
 #include <linux/printk.h>
-#include <linux/filter.h>
 #include <linux/idr.h>
 #include <linux/cpumask.h>
-
-#include <linux/bpf_verifier.h>
-#include <linux/bpf.h>
+#include <linux/mutex.h>
 #include <linux/btf.h>
 #include <linux/btf_ids.h>
+#include <linux/version.h>
+#include <net/xdp.h>
 
 #include "allocator.h"
 #include "hs_runtime.h"
 #include "database.h"
 #include "scratch.h"
-#include "nfa/nfa_api_queue.h"
-#include "rose/rose_internal.h"
+//#include "nfa/nfa_api_queue.h"
+//#include "rose/rose_internal.h"
 
-#define DATABASE_MAX_SIZE 128*PAGE_SIZE
+static ulong max_db_size = 4 << 20;
+module_param(max_db_size, ulong, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(max_db_size, "Maximum size of configfs upload, default=4MB");
 
-struct rex_item {
-	struct config_item cfg;
+static DEFINE_IDR(rex_idr);
+static DEFINE_MUTEX(rex_config_mutex);
 
-	int id;
-
-	atomic_t bytes_scanned;
-	atomic_t use_count;
-	atomic_t hit_count;
-
-	hs_database_t __rcu *database;
-	void __rcu __percpu *scratch;
+/** A wrapper around hs_database_t where we may store additional fields. */
+struct rex_database {
+	void __percpu *scratch; /* TODO: make it global */
+	hs_database_t ptr[] __aligned(8);
 };
 
-DEFINE_IDR(rex_item_idr);
+/**
+ * struct rex_policy - Represent a configurable hyperscan database.
+ * @id:		Handle used by BPF programs from rex_scan_bytes() kfunc (rw).
+ * @epoch:	Sequential number which may be used to detect changes (ro).
+ * @tag:	An arbitrary user string (rw).
+ * @database:	Compiled database binary (rw).
+ *
+ * Contains other derived read-only parameters:
+ * /info:	Brief database description.
+ *
+ */
 
-static int rex_match_handler(unsigned int id,
-			     unsigned long long from, unsigned long long to,
-			     unsigned int flags, void *ctx)
+struct rex_policy {
+	u32 id;
+	u32 epoch;
+	char *tag;
+	/* override (RW): return a specific result instead of scanning */
+	struct rex_database __rcu *database;
+	struct config_item item;
+};
+
+static int rex_scan_cb(unsigned expression,
+		       unsigned long long from,
+		       unsigned long long to,
+		       unsigned flags,
+		       void *ctx)
 {
-	*(int*)ctx = id;
-	return 1; /* cease matching */
+	struct rex_scan_attr *attr = ctx;
+
+	attr->last_event = (struct rex_event) {
+		.expression = expression,
+		.from = from,
+		.to = to,
+		.flags = flags,
+	};
+
+	attr->event_count += 1;
+
+	if (attr->handler_flags & REX_SINGLE_SHOT) {
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
-int xdp_rex_match(u32 rex_id, const void *haystack, u32 len)
+int bpf_scan_bytes(const void *buf, __u32 buf__sz,
+		   struct rex_scan_attr *scan_attr)
 {
-	struct rex_item *rex;
-	hs_database_t *db;
+	struct rex_policy *rex;
+	struct rex_database *db;
 	hs_scratch_t *scratch;
-	int match = -ESRCH;
+	hs_error_t err;
 
-	rcu_read_lock();
+	WARN_ON_ONCE(!rcu_read_lock_held() && !rcu_read_lock_bh_held());
 
-	if (!likely(rex = idr_find(&rex_item_idr, rex_id))) {
-		rcu_read_unlock();
+	if (unlikely(!buf || !scan_attr))
+		return -EINVAL;
+
+	rex = idr_find(&rex_idr, scan_attr->database_id);
+	if (unlikely(!rex))
 		return -EBADF;
-	}
 
 	db = rcu_dereference(rex->database);
-	scratch = this_cpu_ptr(rcu_dereference(rex->scratch));
+	if (unlikely(!db))
+		return -ENODATA;
 
-	if (likely(db)) {
-		pr_debug("hs_scan %u bytes\n", len);
-		// atomic_add(len, &rex->bytes_scanned);
-		// atomic_inc(&rex->use_count);
+	scratch = this_cpu_ptr(db->scratch);
 
-		kernel_fpu_begin();
-		hs_scan(db, haystack, len, 0, scratch,
-			rex_match_handler, &match);
-		kernel_fpu_end();
+	kernel_fpu_begin();
+	err = hs_scan(db->ptr, buf, buf__sz, 0, scratch,
+		      rex_scan_cb, scan_attr);
+	kernel_fpu_end();
 
-		// if (match != -ESRCH)
-		// 	atomic_inc(&rex->hit_count);
+	switch (err) {
+	case HS_DB_MODE_ERROR:
+		return -ENOEXEC;
+	case HS_SCAN_TERMINATED:
+		return 1;
+	case HS_SUCCESS:
+		return 0;
+	case HS_SCRATCH_IN_USE:
+		BUG();
+	case HS_INVALID:
+	case HS_UNKNOWN_ERROR:
+	default:
+		WARN(1, KERN_ERR "hs_scan() failed with code %d\n", (int) err);
+		return -EFAULT;
 	}
+}
+EXPORT_SYMBOL(bpf_scan_bytes);
 
-	rcu_read_unlock();
-	return match;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
+/* Based on code taken from net/core/filter.c */
+static void *bpf_xdp_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
+{
+	u32 size = xdp->data_end - xdp->data;
+	void *addr = xdp->data;
+
+	if (unlikely(offset > 0xffff || len > 0xffff))
+		return ERR_PTR(-EFAULT);
+
+	if (offset + len > size)
+		return ERR_PTR(-EINVAL);
+
+	return addr + offset;
+}
+#else
+/* This code is taken from net/core/filter.c */
+static void *bpf_xdp_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
+{
+	u32 size = xdp->data_end - xdp->data;
+	void *addr = xdp->data;
+	struct skb_shared_info *sinfo = xdp_get_shared_info_from_buff(xdp);
+	int i;
+
+	if (unlikely(offset > 0xffff || len > 0xffff))
+		return ERR_PTR(-EFAULT);
+
+	if (offset + len > xdp_get_buff_len(xdp))
+		return ERR_PTR(-EINVAL);
+
+	if (offset < size) /* linear area */
+		goto out;
+
+	offset -= size;
+	for (i = 0; i < sinfo->nr_frags; i++) { /* paged area */
+		u32 frag_size = skb_frag_size(&sinfo->frags[i]);
+
+		if  (offset < frag_size) {
+			addr = skb_frag_address(&sinfo->frags[i]);
+			size = frag_size;
+			break;
+		}
+		offset -= frag_size;
+	}
+out:
+	return offset + len < size ? addr + offset : NULL;
+}
+#endif
+
+int bpf_xdp_scan_bytes(struct xdp_md *xdp_md, u32 offset, u32 len,
+		       struct rex_scan_attr *scan_attr)
+{
+	struct xdp_buff *xdp = (struct xdp_buff *) xdp_md;
+	void *ptr = bpf_xdp_pointer(xdp, offset, len);
+
+	if (IS_ERR(ptr))
+		return PTR_ERR(ptr);
+
+	if (likely(ptr))
+		return bpf_scan_bytes(ptr, len, scan_attr);
+	else
+		return -ENOTSUPP;
+}
+EXPORT_SYMBOL(bpf_xdp_scan_bytes);
+
+BTF_SET_START(rex_kfunc_ids)
+BTF_ID(func, bpf_scan_bytes)
+BTF_ID(func, bpf_xdp_scan_bytes)
+BTF_SET_END(rex_kfunc_ids)
+static DEFINE_KFUNC_BTF_ID_SET(&rex_kfunc_ids, rex_kfunc_btf_set);
+
+static struct rex_policy *to_policy(struct config_item *item)
+{
+	return item ?
+		container_of(item, struct rex_policy, item) :
+		NULL;
 }
 
-EXPORT_SYMBOL(xdp_rex_match);
-
-BTF_SET_START(xdp_rex_kfunc_ids)
-BTF_ID(func, xdp_rex_match)
-BTF_SET_END(xdp_rex_kfunc_ids)
-static DEFINE_KFUNC_BTF_ID_SET(&xdp_rex_kfunc_ids, xdp_rex_kfunc_btf_set);
-
-static ssize_t rex_database_read(struct config_item *cfg,
-				 void *data, size_t size)
+static ssize_t rexcfg_database_read(struct config_item *item,
+				    void *outbuf, size_t size)
 {
-	struct rex_item *rex = container_of(cfg, struct rex_item, cfg);
-	hs_database_t *db;
-	char *bytes = data;
+	struct rex_policy *rex = to_policy(item);
+	struct rex_database *db;
+	char *bytes = outbuf;
 	ssize_t ret;
 
 	rcu_read_lock();
-
 	db = rcu_dereference(rex->database);
+
 	if (!bytes) {
-		if (hs_database_size(db, &size) != HS_SUCCESS)
+		/* In first call return size for te buffer. */
+		if (!db || hs_database_size(db->ptr, &ret))
+			ret = 0;
+	} else if (size > 0) {
+		/* In second call fill the buffer with data.
+		   We have to check size again to avoid races. */
+		if (!db || hs_database_size(db->ptr, &ret) || ret != size) {
+			ret = -ETXTBSY;
+			goto out;
+		}
+
+		if (hs_serialize_database(db->ptr, &bytes, NULL)) {
+			WARN(1, KERN_ERR "hs_serialize_database() failed\n");
 			ret = -EIO;
-		else
-			ret = size;
+		}
+
+		/* Check that pointer wasn't overwritten. */
+		BUG_ON(bytes != outbuf);
 	} else {
-		if (hs_serialize_database(db, &bytes, NULL) != HS_SUCCESS)
-			ret = -EIO;
-		else
-			ret = size;
+		return 0;
 	}
 
+out:
 	rcu_read_unlock();
 	return ret;
 }
 
-static void rex_database_reset(struct rex_item *rex, hs_database_t __rcu *db,
-			       hs_scratch_t __rcu *__percpu *scratch)
+static void rex_assign_database(struct rex_policy *rex, struct rex_database *db)
 {
-	db = xchg(&rex->database, db);
-	scratch = xchg(&rex->scratch, scratch);
+	db = rcu_replace_pointer(rex->database, db,
+				 lockdep_is_held(&rex_config_mutex));
+	rex->epoch += 1;
 
-	synchronize_rcu();
-
-	free_percpu(scratch);
-	hs_free_database(db);
+	if (db) {
+		synchronize_rcu();
+		free_percpu(db->scratch);
+		kfree(db);
+	}
 }
 
-static ssize_t rex_database_write(struct config_item *cfg,
-				  const void *data, size_t size)
+static ssize_t rexcfg_database_write(struct config_item *item,
+				     const void *bytes, size_t nbytes)
 {
-	struct rex_item *rex = container_of(cfg, struct rex_item, cfg);
-	hs_database_t *database = NULL;
+	struct rex_policy *rex = to_policy(item);
+	struct rex_database *db;
 	hs_scratch_t *proto = NULL;
-	void __percpu *scratch;
-	size_t scratch_size;
+	size_t alloc_size;
 	int cpu;
 
-	if (hs_deserialize_database(data, size, &database) != HS_SUCCESS)
-		return -EINVAL;
+	/* Drop existing database on empty write. */
+	if (nbytes == 0) {
+		mutex_lock(&rex_config_mutex);
+		rex_assign_database(rex, NULL);
+		mutex_unlock(&rex_config_mutex);
+		return nbytes;
+	}
 
-	if (hs_alloc_scratch(database, &proto) != HS_SUCCESS) {
-		hs_free_database(database);
+	if (hs_serialized_database_size(bytes, nbytes, &alloc_size))
+		return -EIO;
+
+	db = kmalloc(sizeof(*db) + alloc_size, GFP_KERNEL);
+	if (!db)
+		return -ENOMEM;
+
+	if (hs_deserialize_database_at(bytes, nbytes, db->ptr)) {
+		kfree(db);
+		return -EINVAL;
+	}
+
+	if (hs_alloc_scratch(db->ptr, &proto)) {
+		kfree(db);
 		return -ENOMEM;
 	}
 
-	BUG_ON(hs_scratch_size(proto, &scratch_size) != HS_SUCCESS);
-	scratch = __alloc_percpu(scratch_size, 64);
-	if (!scratch) {
-		hs_free_database(database);
+	BUG_ON(hs_scratch_size(proto, &alloc_size));
+	db->scratch = __alloc_percpu(alloc_size, 64);
+	if (!db->scratch) {
+		kfree(db);
+		hs_free_scratch(proto);
 		return -ENOMEM;
 	}
 
 	for_each_possible_cpu(cpu) {
-		hs_scratch_t *dst = per_cpu_ptr(scratch, cpu);
-		BUG_ON(hs_init_scratch(proto, dst) != HS_SUCCESS);
+		hs_scratch_t *dst = per_cpu_ptr(db->scratch, cpu);
+		BUG_ON(hs_init_scratch(proto, dst));
 	}
 	hs_free_scratch(proto);
 
-	rex_database_reset(rex, database, scratch);
-	return size;
+	mutex_lock(&rex_config_mutex);
+	rex_assign_database(rex, db);
+	mutex_unlock(&rex_config_mutex);
+
+	return nbytes;
 }
 
-static ssize_t rex_info_show(struct config_item *cfg, char *str)
+static ssize_t rexcfg_info_show(struct config_item *item, char *str)
 {
-	struct rex_item *rex = container_of(cfg, struct rex_item, cfg);
-	hs_database_t *db;
-	hs_scratch_t *s;
+	struct rex_policy *rex = to_policy(item);
+	struct rex_database *db;
 	char *info;
 	int ret = 0;
 
 	rcu_read_lock();
 
 	db = rcu_dereference(rex->database);
-	s = this_cpu_ptr(rcu_dereference(rex->scratch));
-
-	if (hs_database_info(rex->database, &info) != HS_SUCCESS) {
-		rcu_read_unlock();
-		return -EIO;
+	if (!db || hs_database_info(db->ptr, &info)) {
+		ret = -EIO;
+		goto out;
 	}
 
 	ret += sysfs_emit_at(str, ret, "%s\n", info);
 	hs_misc_free(info);
 
-	ret += sysfs_emit_at(str, ret, "Scratch space required : %u bytes\n", s->scratchSize);
-	ret += sysfs_emit_at(str, ret, "  hs_scratch structure : %zu bytes\n", sizeof(*s));
-	ret += sysfs_emit_at(str, ret, "    tctxt structure    : %zu bytes\n", sizeof(s->tctxt));
-	ret += sysfs_emit_at(str, ret, "  queues               : %zu bytes\n",
-			     s->queueCount * sizeof(struct mq));
-	ret += sysfs_emit_at(str, ret, "  bStateSize           : %u bytes\n", s->bStateSize);
-	ret += sysfs_emit_at(str, ret, "  active queue array   : %u bytes\n", s->activeQueueArraySize);
-	ret += sysfs_emit_at(str, ret, "  qmpq                 : %zu bytes\n",
-		s->queueCount * sizeof(struct queue_match));
-	ret += sysfs_emit_at(str, ret, "  delay info           : %u bytes\n",
-			     s->delay_fatbit_size * DELAY_SLOT_COUNT);
-
+out:
 	rcu_read_unlock();
 	return ret;
 }
 
-static ssize_t rex_id_show(struct config_item *cfg, char* str)
+static ssize_t rexcfg_epoch_show(struct config_item *item, char* str)
 {
-	struct rex_item *rex = container_of(cfg, struct rex_item, cfg);
-	return sysfs_emit(str, "%d\n", rex->id);
+	return snprintf(str, PAGE_SIZE, "%d\n", to_policy(item)->epoch);
 }
 
-static ssize_t rex_stats_show(struct config_item *cfg, char* str)
+static ssize_t rexcfg_id_show(struct config_item *item, char* str)
 {
-	struct rex_item *rex = container_of(cfg, struct rex_item, cfg);
-	int len = 0;
-
-	len += sysfs_emit_at(str, len, "bytes_scanned: %d\n",
-			     atomic_read(&rex->bytes_scanned));
-	len += sysfs_emit_at(str, len, "use_count: %d\n",
-			     atomic_read(&rex->use_count));
-	return len;
+	return snprintf(str, PAGE_SIZE, "%d\n", to_policy(item)->id);
 }
 
-CONFIGFS_ATTR_RO(rex_, id);
-CONFIGFS_ATTR_RO(rex_, info);
-CONFIGFS_ATTR_RO(rex_, stats);
+static ssize_t rexcfg_id_store(struct config_item *item, const char* str,
+			       size_t length)
+{
+	struct rex_policy *rex = to_policy(item);
+	int ret, new_id;
 
-static struct configfs_attribute *rex_attrs[] = {
-	&rex_attr_id,
-	&rex_attr_info,
-	&rex_attr_stats,
-	NULL
-};
+	if (sscanf(str, "%d", &new_id) != 1)
+		return -EINVAL;
 
-CONFIGFS_BIN_ATTR(rex_, database, NULL, DATABASE_MAX_SIZE);
+	mutex_lock(&rex_config_mutex);
 
-static struct configfs_bin_attribute *rex_bin_attrs[] = {
-	&rex_attr_database,
-	NULL,
-};
+	if (rex->id == new_id) {
+		ret = length;
+		goto out;
+	}
+
+	ret = idr_alloc(&rex_idr, rex, new_id, new_id+1, GFP_KERNEL);
+	if (ret < 0)
+		goto out;
+
+	BUG_ON(idr_remove(&rex_idr, rex->id) != rex);
+	rex->id = new_id;
+	ret = length;
+
+out:
+	mutex_unlock(&rex_config_mutex);
+	return ret;
+}
+
+/* Our subsystem hierarchy is:
+ *
+ * /sys/kernel/config/rex/
+ *		|
+ *		<policy>/
+ *		|	id		(rw)
+ *		|	database	(rw)
+ *		|	epoch		(ro)
+ *		|	info		(ro)
+ *		|	tag		(rw)
+ *		|
+ *		<policy>/...
+ */
+
+CONFIGFS_BIN_ATTR(rexcfg_, database, NULL, 0);
+CONFIGFS_ATTR_RO(rexcfg_, epoch);
+CONFIGFS_ATTR_RO(rexcfg_, info);
+CONFIGFS_ATTR(rexcfg_, id);
+
+static void rexcfg_item_release(struct config_item *item)
+{
+	struct rex_policy *rex = to_policy(item);
+
+	mutex_lock(&rex_config_mutex);
+	BUG_ON(idr_remove(&rex_idr, rex->id) != rex);
+	rex_assign_database(rex, NULL);
+	mutex_unlock(&rex_config_mutex);
+}
 
 static const struct config_item_type rex_type = {
-	.ct_owner	= THIS_MODULE,
-	.ct_attrs	= rex_attrs,
-	.ct_bin_attrs	= rex_bin_attrs,
+	.ct_owner		= THIS_MODULE,
+	.ct_attrs		= (struct configfs_attribute*[]) {
+		&rexcfg_attr_id,
+		&rexcfg_attr_info,
+		&rexcfg_attr_epoch,
+		NULL
+	},
+	.ct_bin_attrs		= (struct configfs_bin_attribute*[]) {
+		&rexcfg_attr_database,
+		NULL,
+	},
+	.ct_item_ops		= &(struct configfs_item_operations) {
+		.release	= rexcfg_item_release,
+	}
 };
 
 static struct config_item *rex_make_item(struct config_group *group,
 					 const char *name)
 {
-	struct rex_item *rex;
+	struct rex_policy *rex;
+	int id;
 
 	rex = kzalloc(sizeof(*rex), GFP_KERNEL);
 	if (!rex)
 		return ERR_PTR(-ENOMEM);
 
-	config_item_init_type_name(&rex->cfg, name, &rex_type);
+	mutex_lock(&rex_config_mutex);
 
-	rex->id = idr_alloc(&rex_item_idr, rex, 0, 0, GFP_KERNEL);
-	if (rex->id < 0) {
+	/* Patch database attribute type */
+	rexcfg_attr_database.cb_max_size = max_db_size;
+	config_item_init_type_name(&rex->item, name, &rex_type);
+
+	id = idr_alloc(&rex_idr, rex, 0, U32_MAX, GFP_KERNEL);
+	if (id < 0) {
 		kfree(rex);
-		return ERR_PTR(rex->id);
+		return ERR_PTR(id);
 	}
+	rex->id = id;
 
-	return &rex->cfg;
+	mutex_unlock(&rex_config_mutex);
+
+	return &rex->item;
 }
-
-static void rex_drop_item(struct config_group *group,
-			  struct config_item *cfg)
-{
-	struct rex_item *rex = container_of(cfg, struct rex_item, cfg);
-
-	idr_remove(&rex_item_idr, rex->id);
-	rex_database_reset(rex, NULL, NULL);
-	config_item_put(cfg);
-}
-
-static struct configfs_group_operations rex_group_ops = {
-	.make_item = rex_make_item,
-	.drop_item = rex_drop_item,
-};
 
 static const struct config_item_type rex_group_type = {
-	.ct_owner	= THIS_MODULE,
-	.ct_group_ops	= &rex_group_ops,
+	.ct_owner		= THIS_MODULE,
+	.ct_group_ops		= &(struct configfs_group_operations) {
+		.make_item	= rex_make_item,
+	},
 };
 
 static struct configfs_subsystem rex_configfs = {
-	.su_group = {
-		.cg_item = {
-			.ci_namebuf = "rex",
-			.ci_type = &rex_group_type,
+	.su_mutex		= __MUTEX_INITIALIZER(rex_configfs.su_mutex),
+	.su_group		= {
+		.cg_item	= {
+			.ci_namebuf	= "rex",
+			.ci_type	= &rex_group_type,
 		},
 	},
-	.su_mutex = __MUTEX_INITIALIZER(rex_configfs.su_mutex),
 };
 
 static void print_banner(void)
@@ -323,7 +496,7 @@ static void print_banner(void)
 	pr_cont("\n");
 }
 
-static int __init xdp_rex_init(void)
+static int __init rex_init(void)
 {
 	int ret;
 	struct config_group *root = &rex_configfs.su_group;
@@ -334,21 +507,25 @@ static int __init xdp_rex_init(void)
 	if ((ret = configfs_register_subsystem(&rex_configfs)))
 		return ret;
 
-	register_kfunc_btf_id_set(&prog_test_kfunc_list, &xdp_rex_kfunc_btf_set);
+	register_kfunc_btf_id_set(&prog_test_kfunc_list, &rex_kfunc_btf_set);
 
 	return 0;
 }
 
 
-static void __exit xdp_rex_exit(void)
+static void __exit rex_exit(void)
 {
-	unregister_kfunc_btf_id_set(&prog_test_kfunc_list, &xdp_rex_kfunc_btf_set);
-
+	unregister_kfunc_btf_id_set(&prog_test_kfunc_list, &rex_kfunc_btf_set);
 	configfs_unregister_subsystem(&rex_configfs);
+	WARN_ON(!idr_is_empty(&rex_idr));
+	idr_destroy(&rex_idr);
 	pr_info("xdp_rex_exit\n");
 }
 
-module_init(xdp_rex_init);
-module_exit(xdp_rex_exit);
-MODULE_LICENSE("GPL");
+module_init(rex_init);
+module_exit(rex_exit);
+
+/* Module information */
+MODULE_AUTHOR("Sergey Nizovtsev, sn@tempesta-tech.com");
 MODULE_DESCRIPTION("Hyperscan regex engine");
+MODULE_LICENSE("GPL");
