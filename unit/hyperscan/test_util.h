@@ -69,12 +69,16 @@ int record_cb(unsigned id, unsigned long long, unsigned long long to,
               unsigned, void *ctxt);
 
 // Dummy callback: does nothing, returns 0 (keep matching)
-static UNUSED
 int dummy_cb(unsigned, unsigned long long, unsigned long long, unsigned,
-             void *) {
-    // empty
-    return 0;
-}
+             void *);
+
+// Counts number fo matches into context, returns 0 (keep matching)
+int count_cb(unsigned, unsigned long long, unsigned long long, unsigned,
+             void *ctxt);
+
+// Counts number fo matches into context, returns 1 (cease matching)
+int terminate_cb(unsigned, unsigned long long, unsigned long long, unsigned,
+                 void *ctxt);
 
 struct pattern {
     std::string expression;
