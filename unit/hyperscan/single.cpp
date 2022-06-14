@@ -494,24 +494,6 @@ class HyperscanTestMatchTerminate : public TestWithParam<TerminateMatchData> {
     // empty
 };
 
-// Simple non-terminating callback: increments the int pointed to by the context
-// and tells the matcher to keep going.
-int countHandler(unsigned, unsigned long long, unsigned long long,
-                 unsigned, void *ctx) {
-    int *count = (int *)ctx;
-    (*count)++;
-    return 0; // keep going
-}
-
-// Simple terminating callback: increments the int pointed to by the context
-// and tells the matcher to stop.
-int terminateHandler(unsigned, unsigned long long, unsigned long long,
-                     unsigned, void *ctx) {
-    int *count = (int *)ctx;
-    (*count)++;
-    return 1; // stop matching
-}
-
 TEST_P(HyperscanTestMatchTerminate, MoreThanOne) {
     const TerminateMatchData &data = GetParam();
 
@@ -522,7 +504,7 @@ TEST_P(HyperscanTestMatchTerminate, MoreThanOne) {
 
     int count = 0;
     err = hs_scan(db, data.corpus, strlen(data.corpus), 0, scratch,
-                  countHandler, &count);
+                  count_cb, &count);
     ASSERT_EQ(HS_SUCCESS, err) << "hs_scan didn't return HS_SCAN_TERMINATED";
     ASSERT_LT(1, count) << "Number of matches returned was not greater than 1.";
 
@@ -541,7 +523,7 @@ TEST_P(HyperscanTestMatchTerminate, Block) {
 
     int count = 0;
     err = hs_scan(db, data.corpus, strlen(data.corpus), 0, scratch,
-                  terminateHandler, &count);
+                  terminate_cb, &count);
     ASSERT_EQ(HS_SCAN_TERMINATED, err)
         << "hs_scan didn't return HS_SCAN_TERMINATED";
     ASSERT_EQ(1, count) << "Number of matches returned was not 1.";
@@ -566,10 +548,10 @@ TEST_P(HyperscanTestMatchTerminate, StreamWhole) {
     ASSERT_TRUE(stream != nullptr);
 
     err = hs_scan_stream(stream, data.corpus, strlen(data.corpus), 0, scratch,
-                         terminateHandler, &count);
+                         terminate_cb, &count);
     ASSERT_TRUE(err == HS_SUCCESS || err == HS_SCAN_TERMINATED);
 
-    err = hs_close_stream(stream, scratch, terminateHandler, &count);
+    err = hs_close_stream(stream, scratch, terminate_cb, &count);
     ASSERT_EQ(1, count) << "Number of matches returned was not 1.";
 
     err = hs_free_scratch(scratch);
@@ -594,11 +576,11 @@ TEST_P(HyperscanTestMatchTerminate, StreamByteByByte) {
     size_t len = strlen(data.corpus);
     for (size_t i = 0; i < len; i++) {
         err = hs_scan_stream(stream, data.corpus + i, 1, 0, scratch,
-                             terminateHandler, &count);
+                             terminate_cb, &count);
         ASSERT_TRUE(err == HS_SUCCESS || err == HS_SCAN_TERMINATED);
     }
 
-    err = hs_close_stream(stream, scratch, terminateHandler, &count);
+    err = hs_close_stream(stream, scratch, terminate_cb, &count);
     ASSERT_EQ(1, count) << "Number of matches returned was not 1.";
 
     err = hs_free_scratch(scratch);

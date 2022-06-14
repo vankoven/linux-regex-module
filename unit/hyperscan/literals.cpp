@@ -85,14 +85,6 @@ protected:
 };
 
 static
-int count_cb(unsigned, unsigned long long, unsigned long long, unsigned,
-             void *ctxt) {
-    size_t *count = (size_t *)ctxt;
-    (*count)++;
-    return 0;
-}
-
-static
 void do_scan_block(const vector<string> &corpora, const hs_database_t *db,
                    hs_scratch_t *scratch) {
     size_t count = 0;
