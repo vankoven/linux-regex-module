@@ -1426,3 +1426,5 @@ option(BUILD_EXAMPLES "Build Hyperscan example code (default TRUE)" TRUE)
 if(NOT WIN32 AND BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
+
+option(TEST_XDPSCAN "Build Hyperscan unit tests for XDP module" FALSE)

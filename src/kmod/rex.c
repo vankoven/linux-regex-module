@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+#define CREATE_TRACE_POINTS
+#include "rex_trace.h"
 #include "rex.h"
 
 #include "hs_runtime.h"
@@ -17,7 +19,6 @@
 #include <linux/btf.h>
 #include <linux/btf_ids.h>
 #include <net/xdp.h>
-
 
 static ulong max_db_size = 4 << 20;
 module_param(max_db_size, ulong, S_IRUGO | S_IWUSR);
@@ -40,7 +41,7 @@ static inline hs_database_t *patterns(struct rex_database *db)
 }
 
 /**
- * struct rex_policy - Represent a configurable hyperscan database.
+ * Represent a configurable hyperscan database.
  * @id:		Handle used by BPF programs from rex_scan_bytes() kfunc (rw).
  * @epoch:	Sequential number which may be used to detect changes (ro).
  * @tag:	An arbitrary user string (rw).
@@ -50,7 +51,6 @@ static inline hs_database_t *patterns(struct rex_database *db)
  * /info:	Brief database description.
  *
  */
-
 struct rex_policy {
 	u32 id;
 	u32 epoch;
@@ -59,13 +59,21 @@ struct rex_policy {
 	struct config_item item;
 };
 
+struct rex_scan_ctx {
+	struct rex_scan_attr *attr;
+	const void *block;
+	size_t block_len;
+};
+
 static int rex_scan_cb(unsigned expression,
 		       unsigned long long from,
 		       unsigned long long to,
 		       unsigned flags,
-		       void *ctx)
+		       void *raw_ctx)
 {
-	struct rex_scan_attr *attr = ctx;
+	struct rex_scan_ctx *ctx = raw_ctx;
+	struct rex_scan_attr *attr = ctx->attr;
+	u32 features = attr->handler_flags;
 
 	attr->last_event = (struct rex_event) {
 		.expression = expression,
@@ -74,18 +82,20 @@ static int rex_scan_cb(unsigned expression,
 		.flags = flags,
 	};
 
-	attr->event_count += 1;
+	trace_rex_match(attr);
+	attr->nr_events += 1;
 
-	if (attr->handler_flags & REX_SINGLE_SHOT) {
-		return 1;
-	} else {
-		return 0;
-	}
+	return (features & REX_SINGLE_SHOT) ? 1 : 0;
 }
 
 int bpf_scan_bytes(const void *buf, __u32 buf__sz,
-		   struct rex_scan_attr *scan_attr)
+		   struct rex_scan_attr *attr)
 {
+	struct rex_scan_ctx ctx = {
+		.attr = attr,
+		.block = buf,
+		.block_len = buf__sz,
+	};
 	struct rex_policy *rex;
 	struct rex_database *db;
 	hs_scratch_t *scratch;
@@ -93,10 +103,10 @@ int bpf_scan_bytes(const void *buf, __u32 buf__sz,
 
 	WARN_ON_ONCE(!rcu_read_lock_held() && !rcu_read_lock_bh_held());
 
-	if (unlikely(!buf || !scan_attr))
+	if (unlikely(!buf || !attr))
 		return -EINVAL;
 
-	rex = idr_find(&rex_idr, scan_attr->database_id);
+	rex = idr_find(&rex_idr, attr->database_id);
 	if (unlikely(!rex))
 		return -EBADF;
 
@@ -108,7 +118,7 @@ int bpf_scan_bytes(const void *buf, __u32 buf__sz,
 
 	kernel_fpu_begin();
 	err = hs_scan(patterns(db), buf, buf__sz, 0, scratch,
-		      rex_scan_cb, scan_attr);
+		      rex_scan_cb, &ctx);
 	kernel_fpu_end();
 
 	switch (err) {
@@ -193,16 +203,9 @@ int bpf_xdp_scan_bytes(struct xdp_md *xdp_md, u32 offset, u32 len,
 }
 EXPORT_SYMBOL(bpf_xdp_scan_bytes);
 
-int bpf_map_test(struct bpf_map *map)
-{
-	return 42;
-}
-EXPORT_SYMBOL(bpf_map_test);
-
 BTF_SET_START(rex_kfunc_ids)
 BTF_ID(func, bpf_scan_bytes)
 BTF_ID(func, bpf_xdp_scan_bytes)
-BTF_ID(func, bpf_map_test)
 BTF_SET_END(rex_kfunc_ids)
 static DEFINE_KFUNC_BTF_ID_SET(&rex_kfunc_ids, rex_kfunc_btf_set);
 
@@ -226,7 +229,7 @@ static ssize_t rexcfg_database_read(struct config_item *item,
 
 	if (!bytes) {
 		/* In first call return size for te buffer. */
-		if (!hs_database_size(patterns(db), &ret))
+		if (hs_database_size(patterns(db), &ret))
 			ret = 0;
 	} else if (size > 0) {
 		/* In second call fill the buffer with data.
