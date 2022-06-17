@@ -75,6 +75,11 @@ endif()
 
 if (TEST_XDPSCAN)
 
+find_package(LibBpf REQUIRED)
+if ("${LINUX_TOOLS_INCLUDE_DIR}" STREQUAL "")
+    message(FATAL_ERROR "Please set LINUX_TOOLS_INCLUDE_DIR")
+endif()
+
 set(unit_xdpscan_SOURCES
     ${gtest_SOURCES}
     hyperscan/test_util.cpp
@@ -88,24 +93,24 @@ set(unit_xdpscan_SOURCES
     hyperscan/single.cpp
     hyperscan/order.cpp
     hyperscan/xdp_scan.cpp
-    hyperscan/xdp_runner.c
     )
 add_executable(unit-xdpscan ${unit_xdpscan_SOURCES})
-target_link_options(unit-xdpscan PRIVATE -Wl,--wrap=hs_scan)
+target_link_options(unit-xdpscan
+    PRIVATE -Wl,--wrap=hs_scan)
+add_library(xdp-runner hyperscan/xdp_runner.c)
+target_include_directories(xdp-runner SYSTEM BEFORE
+    PRIVATE ${LINUX_TOOLS_INCLUDE_DIR} ${LIBBPF_INCLUDE_DIRS}
+    )
 
 if (BUILD_STATIC_AND_SHARED OR BUILD_SHARED_LIBS)
-target_link_libraries(unit-xdpscan hs_shared expressionutil bpf)
+    target_link_libraries(unit-xdpscan
+        hs_shared expressionutil xdp-runner ${LIBBPF_LIBRARIES})
 else()
-#target_link_libraries(unit-xdpscan hs expressionutil bpf)
-target_include_directories(unit-xdpscan PRIVATE
-    /home/sergio/gcore/xdp-progs/libbpf/include/
-    )
-target_link_options(unit-xdpscan PRIVATE -static)
-target_link_libraries(unit-xdpscan hs expressionutil
-    /home/sergio/gcore/xdp-progs/build/external/usr/lib64/libbpf.a elf z
-    )
+    #target_link_options(unit-xdpscan PRIVATE -static)
+    target_link_libraries(unit-xdpscan
+        hs expressionutil xdp-runner ${LIBBPF_LIBRARIES}
+        )
 endif()
-
 endif()
 
 if (NOT (RELEASE_BUILD OR FAT_RUNTIME))
