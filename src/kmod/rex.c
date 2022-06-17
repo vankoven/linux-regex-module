@@ -1,4 +1,6 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-2.0
+// SPDX-FileCopyrightText: Copyright 2022 G-Core Labs S.A.
+
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #define CREATE_TRACE_POINTS
@@ -21,7 +23,7 @@
 #include <net/xdp.h>
 
 static ulong max_db_size = 4 << 20;
-module_param(max_db_size, ulong, S_IRUGO | S_IWUSR);
+module_param(max_db_size, ulong, 0644);
 MODULE_PARM_DESC(max_db_size, "Maximum size of configfs upload, default=4MB");
 
 static DEFINE_IDR(rex_idr);
@@ -65,10 +67,10 @@ struct rex_scan_ctx {
 	size_t block_len;
 };
 
-static int rex_scan_cb(unsigned expression,
+static int rex_scan_cb(unsigned int expression,
 		       unsigned long long from,
 		       unsigned long long to,
-		       unsigned flags,
+		       unsigned int flags,
 		       void *raw_ctx)
 {
 	struct rex_scan_ctx *ctx = raw_ctx;
@@ -132,13 +134,13 @@ int bpf_scan_bytes(const void *buf, __u32 buf__sz,
 	case HS_INVALID:
 	case HS_UNKNOWN_ERROR:
 	default:
-		WARN(1, KERN_ERR "hs_scan() failed with code %d\n", (int) err);
+		WARN(1, "hs_scan() failed with code %d\n", (int) err);
 		return -EFAULT;
 	}
 }
 EXPORT_SYMBOL(bpf_scan_bytes);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
 /* Based on code taken from net/core/filter.c */
 static void *bpf_xdp_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
 {
@@ -233,14 +235,15 @@ static ssize_t rexcfg_database_read(struct config_item *item,
 			ret = 0;
 	} else if (size > 0) {
 		/* In second call fill the buffer with data.
-		   We have to check size again to avoid races. */
+		 * We have to check size again to avoid races.
+		 */
 		if (hs_database_size(patterns(db), &ret) || ret != size) {
 			ret = -ETXTBSY;
 			goto out;
 		}
 
 		if (hs_serialize_database(patterns(db), &bytes, NULL)) {
-			WARN(1, KERN_ERR "hs_serialize_database() failed\n");
+			WARN(1, "hs_serialize_database() failed\n");
 			ret = -EIO;
 		}
 
@@ -312,6 +315,7 @@ static ssize_t rexcfg_database_write(struct config_item *item,
 
 	for_each_possible_cpu(cpu) {
 		hs_scratch_t *dst = per_cpu_ptr(db->scratch, cpu);
+
 		BUG_ON(hs_init_scratch(proto, dst));
 	}
 	hs_free_scratch(proto);
@@ -346,23 +350,24 @@ out:
 	return ret;
 }
 
-static ssize_t rexcfg_epoch_show(struct config_item *item, char* str)
+static ssize_t rexcfg_epoch_show(struct config_item *item, char *str)
 {
 	return snprintf(str, PAGE_SIZE, "%d\n", to_policy(item)->epoch);
 }
 
-static ssize_t rexcfg_id_show(struct config_item *item, char* str)
+static ssize_t rexcfg_id_show(struct config_item *item, char *str)
 {
 	return snprintf(str, PAGE_SIZE, "%d\n", to_policy(item)->id);
 }
 
-static ssize_t rexcfg_id_store(struct config_item *item, const char* str,
+static ssize_t rexcfg_id_store(struct config_item *item, const char *str,
 			       size_t length)
 {
 	struct rex_policy *rex = to_policy(item);
 	int ret, new_id;
 
-	if (sscanf(str, "%d", &new_id) != 1)
+	ret = kstrtoint(str, 0, &new_id);
+	if (ret < 0)
 		return -EINVAL;
 
 	mutex_lock(&rex_config_mutex);
@@ -476,25 +481,23 @@ static struct configfs_subsystem rex_configfs = {
 	},
 };
 
-static void print_banner(void)
+static void banner(void)
 {
-	pr_info("Hyperscan %s", hs_version());
-	pr_cont("\n");
+	pr_info("Hyperscan %s\n", hs_version());
 }
 
 static int __init rex_init(void)
 {
-	int ret;
-	struct config_group *root = &rex_configfs.su_group;
+	int err;
 
-	print_banner();
-
-	config_group_init(root);
-	if ((ret = configfs_register_subsystem(&rex_configfs)))
-		return ret;
+	config_group_init(&rex_configfs.su_group);
+	err = configfs_register_subsystem(&rex_configfs);
+	if (err)
+		return err;
 
 	register_kfunc_btf_id_set(&prog_test_kfunc_list, &rex_kfunc_btf_set);
 
+	banner();
 	return 0;
 }
 
