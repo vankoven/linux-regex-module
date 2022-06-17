@@ -30,6 +30,8 @@ do {				\
 	fprintf(stderr, "xdpscan: " fmt, ##__VA_ARGS__);	\
 } while (0)
 
+#define ARRAY_LENGTH(a) (sizeof(a)/sizeof((a)[0]))
+
 static
 __s64 determine_kfunc_id(const char *mod, const char* symb)
 {
@@ -186,7 +188,7 @@ int init_xdp_prog(void)
 		.fd_array = fd_array,
 	);
 	ret = bpf_prog_load(BPF_PROG_TYPE_XDP, NULL, "Dual BSD/GPL",
-			    xdp_prog, ARRAY_SIZE(xdp_prog), &prog_opts);
+			    xdp_prog, ARRAY_LENGTH(xdp_prog), &prog_opts);
 	if (ret < 0) {
 		pr_warn("failed to load rex program (%d):\n%s", errno, log_buf);
 		close(attr_map_fd);
@@ -347,7 +349,7 @@ int init_handler_prog(__u32 max_entries)
 	);
 
 	ret = bpf_prog_load(BPF_PROG_TYPE_TRACEPOINT, NULL, "Dual BSD/GPL",
-			    handler_prog, ARRAY_SIZE(handler_prog), &opts);
+			    handler_prog, ARRAY_LENGTH(handler_prog), &opts);
 	if (ret < 0) {
 		pr_warn("failed to load match handler:\n%s", log_buf);
 		return ret;
