@@ -1,3 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-FileCopyrightText: Copyright 2022 G-Core Labs S.A. */
+
 #ifndef REX_ABI_USER_H
 #define REX_ABI_USER_H
 
@@ -12,10 +15,10 @@ extern "C" {
 #endif
 
 /**
-  * Structure describing a match event.
-  */
+ * Structure describing a match event.
+ */
 struct rex_event {
-	unsigned expression;
+	unsigned int expression;
 	unsigned long long from;
 	unsigned long long to;
 	unsigned long long flags;
