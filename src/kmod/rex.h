@@ -63,7 +63,7 @@ int bpf_scan_bytes(const void *buf, __u32 buf__sz,
  * @xdp_md:		A pointer to struct xdp_buff* actually.
  * @scan_attr:		Input/output match attributes.
  */
-int bpf_xdp_scan_bytes(struct xdp_md *xdp_md, __u32 offset, __u32 len,
+int bpf_xdp_scan_bytes(const struct xdp_md *xdp_md, __u32 offset, __u32 len,
 		       struct rex_scan_attr *scan_attr) __ksym;
 
 #endif /* __KERNEL__ or __bpf__ */
