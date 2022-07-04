@@ -142,7 +142,7 @@ EXPORT_SYMBOL(bpf_scan_bytes);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
 /* Based on code taken from net/core/filter.c */
-static void *bpf_xdp_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
+static void *bpf_xdp_pointer(const struct xdp_buff *xdp, u32 offset, u32 len)
 {
 	u32 size = xdp->data_end - xdp->data;
 	void *addr = xdp->data;
@@ -157,7 +157,7 @@ static void *bpf_xdp_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
 }
 #else
 /* This code is taken from net/core/filter.c */
-static void *bpf_xdp_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
+static void *bpf_xdp_pointer(const struct xdp_buff *xdp, u32 offset, u32 len)
 {
 	u32 size = xdp->data_end - xdp->data;
 	void *addr = xdp->data;
@@ -189,7 +189,7 @@ out:
 }
 #endif
 
-int bpf_xdp_scan_bytes(struct xdp_md *xdp_md, u32 offset, u32 len,
+int bpf_xdp_scan_bytes(const struct xdp_md *xdp_md, u32 offset, u32 len,
 		       struct rex_scan_attr *scan_attr)
 {
 	struct xdp_buff *xdp = (struct xdp_buff *) xdp_md;
