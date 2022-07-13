@@ -46,7 +46,7 @@ static inline hs_database_t *patterns(struct rex_database *db)
  * Represent a configurable hyperscan database.
  * @id:		Handle used by BPF programs from rex_scan_bytes() kfunc (rw).
  * @epoch:	Sequential number which may be used to detect changes (ro).
- * @tag:	An arbitrary user string (rw).
+ * @note:	An arbitrary user string (rw).
  * @database:	Compiled database binary (rw).
  *
  * Contains other derived read-only parameters:
@@ -56,7 +56,7 @@ static inline hs_database_t *patterns(struct rex_database *db)
 struct rex_policy {
 	u32 id;
 	u32 epoch;
-	char *tag;
+	const char *note;
 	struct rex_database __rcu *database;
 	struct config_item item;
 };
@@ -390,6 +390,25 @@ out:
 	return ret;
 }
 
+static ssize_t rexcfg_note_show(struct config_item *item, char *str)
+{
+	return snprintf(str, PAGE_SIZE, "%s", to_policy(item)->note);
+}
+
+static ssize_t rexcfg_note_store(struct config_item *item, const char *str,
+				 size_t length)
+{
+	struct rex_policy *rex = to_policy(item);
+
+	mutex_lock(&rex_config_mutex);
+	if (rex->note)
+		kfree(rex->note);
+	rex->note = kstrndup(str, length, GFP_KERNEL);
+	mutex_unlock(&rex_config_mutex);
+
+	return length;
+}
+
 /* Our subsystem hierarchy is:
  *
  * /sys/kernel/config/rex/
@@ -399,7 +418,7 @@ out:
  *		|	database	(rw)
  *		|	epoch		(ro)
  *		|	info		(ro)
- *		|	tag		(rw)
+ *		|	note		(rw)
  *		|
  *		<policy>/...
  */
@@ -408,6 +427,7 @@ CONFIGFS_BIN_ATTR(rexcfg_, database, NULL, 0);
 CONFIGFS_ATTR_RO(rexcfg_, epoch);
 CONFIGFS_ATTR_RO(rexcfg_, info);
 CONFIGFS_ATTR(rexcfg_, id);
+CONFIGFS_ATTR(rexcfg_, note);
 
 static void rexcfg_item_release(struct config_item *item)
 {
@@ -425,6 +445,7 @@ static const struct config_item_type rex_type = {
 		&rexcfg_attr_id,
 		&rexcfg_attr_info,
 		&rexcfg_attr_epoch,
+		&rexcfg_attr_note,
 		NULL
 	},
 	.ct_bin_attrs		= (struct configfs_bin_attribute*[]) {
