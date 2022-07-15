@@ -1,0 +1,7 @@
+*.o
+Module.symvers
+*.ko
+.*.cmd
+xdp_rex.mod
+xdp_rex.mod.c
+modules.order

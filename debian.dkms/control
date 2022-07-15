@@ -1,0 +1,15 @@
+Source: linux-rex
+Section: kernel
+Priority: optional
+Maintainer: Sergey Nizovtsev <sn@tempesta-tech.com>
+Build-Depends: debhelper-compat (= 13), dkms
+Standards-Version: 4.6.0
+Homepage: https://github.com/G-Core/linux-regex-module/
+Rules-Requires-Root: no
+
+Package: rex-dkms
+Architecture: all
+Depends: ${misc:Depends}
+Description: Hyperscan module for linux.
+ .
+ It's supposed to work with kernel 5.17 only.
