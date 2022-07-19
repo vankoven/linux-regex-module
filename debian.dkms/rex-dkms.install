@@ -1,3 +1,4 @@
+debian/build.sh				${env:DKMS_DIR}
 src/Kbuild				${env:DKMS_DIR}
 src/kmod				${env:DKMS_DIR}
 src/allocator.h				${env:DKMS_DIR}
