@@ -9,7 +9,7 @@ Rules-Requires-Root: no
 
 Package: rex-dkms
 Architecture: all
-Depends: ${misc:Depends}
+Depends: dwarves, zstd, ${misc:Depends}
 Description: Hyperscan module for linux.
  .
  It's supposed to work with kernel 5.17 only.
