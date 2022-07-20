@@ -2156,8 +2156,8 @@ hwlmcb_rv_t roseRunProgram(const struct RoseEngine *t,
     DEBUG_PRINTF("program=%u, offsets [%llu,%llu], flags=%u\n", programOffset,
                  som, end, prog_flags);
 
-    assert(programOffset != ROSE_INVALID_PROG_OFFSET);
-    assert(programOffset >= sizeof(struct RoseEngine));
+    if (programOffset != ROSE_INVALID_PROG_OFFSET)
+        assert(programOffset >= sizeof(struct RoseEngine));
     assert(programOffset < t->size);
 
     const char in_anchored = prog_flags & ROSE_PROG_FLAG_IN_ANCHORED;
@@ -2177,8 +2177,6 @@ hwlmcb_rv_t roseRunProgram(const struct RoseEngine *t,
     int work_done = 0;
 
     struct RoseContext *tctxt = &scratch->tctxt;
-
-    assert(*(const u8 *)pc != ROSE_INSTR_END);
 
 #if !defined(_WIN32)
     static const void *next_instr[] = {
