@@ -235,7 +235,6 @@ hwlmcb_rv_t roseProcessMatchInline(const struct RoseEngine *t,
                                    struct hs_scratch *scratch, u64a end,
                                    u32 id) {
     DEBUG_PRINTF("id=%u\n", id);
-    assert(id && id < t->size); // id is an offset into bytecode
     const u64a som = 0;
     const u8 flags = 0;
     if (t->pureLiteral) {
