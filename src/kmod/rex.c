@@ -56,9 +56,10 @@ static inline hs_database_t *patterns(struct rex_database *db)
 struct rex_policy {
 	u32 id;
 	u32 epoch;
-	const char *note;
+	struct mutex lock;
 	struct rex_database __rcu *database;
 	struct config_item item;
+	char note[PAGE_SIZE];
 };
 
 struct rex_scan_ctx {
@@ -392,7 +393,14 @@ out:
 
 static ssize_t rexcfg_note_show(struct config_item *item, char *str)
 {
-	return snprintf(str, PAGE_SIZE, "%s", to_policy(item)->note);
+	struct rex_policy *rex = to_policy(item);
+	int ret;
+
+	mutex_lock(&rex->lock);
+	ret = snprintf(str, PAGE_SIZE, "%s", to_policy(item)->note);
+	mutex_unlock(&rex->lock);
+
+	return ret;
 }
 
 static ssize_t rexcfg_note_store(struct config_item *item, const char *str,
@@ -400,11 +408,9 @@ static ssize_t rexcfg_note_store(struct config_item *item, const char *str,
 {
 	struct rex_policy *rex = to_policy(item);
 
-	mutex_lock(&rex_config_mutex);
-	if (rex->note)
-		kfree(rex->note);
-	rex->note = kstrndup(str, length, GFP_KERNEL);
-	mutex_unlock(&rex_config_mutex);
+	mutex_lock(&rex->lock);
+	strncpy(rex->note, str, length);
+	mutex_unlock(&rex->lock);
 
 	return length;
 }
