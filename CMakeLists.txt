@@ -579,7 +579,7 @@ set (hs_exec_common_SRCS
 
 set (hs_exec_SRCS
     ${hs_HEADERS}
-    src/hs_version.h
+    ${PROJECT_BINARY_DIR}/hs_version.h
     src/ue2common.h
     src/allocator.h
     src/crc32.c
@@ -730,13 +730,13 @@ set (hs_exec_avx2_SRCS
 
 SET (hs_compile_SRCS
     ${hs_HEADERS}
+    ${PROJECT_BINARY_DIR}/hs_version.h
     src/crc32.h
     src/database.h
     src/grey.cpp
     src/grey.h
     src/hs.cpp
     src/hs_internal.h
-    src/hs_version.h
     src/scratch.h
     src/state.h
     src/ue2common.h
