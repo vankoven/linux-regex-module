@@ -26,7 +26,7 @@ struct rex_event {
 
 /* handler_flags */
 enum {
-	REX_SINGLE_SHOT		= 1 << 0,
+	REX_SINGLE_SHOT = 1 << 0,
 };
 
 /**

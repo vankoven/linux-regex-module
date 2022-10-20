@@ -37,4 +37,3 @@
 #define HS_VERSION_32BIT ((5 << 24) | (4 << 16) | (0 << 8) | 0)
 
 #endif /* HS_VERSION_H_C6428FAF8E3713 */
-

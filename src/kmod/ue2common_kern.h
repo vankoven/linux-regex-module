@@ -73,13 +73,14 @@ typedef u32 ReportID;
 #define ROUNDUP_CL(a) ROUNDUP_N(a, 64)
 
 /* Align ptr to next N-byte boundary */
-#define ROUNDUP_PTR(ptr, n)   (__typeof__(ptr))(ROUNDUP_N((uintptr_t)(ptr), (n)))
-#define ROUNDDOWN_PTR(ptr, n) (__typeof__(ptr))(ROUNDDOWN_N((uintptr_t)(ptr), (n)))
+#define ROUNDUP_PTR(ptr, n) (__typeof__(ptr))(ROUNDUP_N((uintptr_t)(ptr), (n)))
+#define ROUNDDOWN_PTR(ptr, n) \
+	(__typeof__(ptr))(ROUNDDOWN_N((uintptr_t)(ptr), (n)))
 
-#define ISALIGNED_N(ptr, n) (((uintptr_t)(ptr) & ((n) - 1)) == 0)
-#define ISALIGNED_16(ptr)   ISALIGNED_N((ptr), 16)
-#define ISALIGNED_CL(ptr)   ISALIGNED_N((ptr), 64)
-#define ISALIGNED(ptr)      ISALIGNED_N((ptr), alignof(__typeof__(*(ptr))))
+#define ISALIGNED_N(ptr, n) (((uintptr_t)(ptr) & ((n)-1)) == 0)
+#define ISALIGNED_16(ptr) ISALIGNED_N((ptr), 16)
+#define ISALIGNED_CL(ptr) ISALIGNED_N((ptr), 64)
+#define ISALIGNED(ptr) ISALIGNED_N((ptr), alignof(__typeof__(*(ptr))))
 #define N_CHARS 256
 
 /* Maximum offset representable in the 'unsigned long long' we use to return
@@ -91,14 +92,14 @@ typedef u32 ReportID;
 #define MIN min
 #define MAX max
 #else
-#define MIN(a,b)      ((a) < (b) ? (a) : (b))
-#define MAX(a,b)      ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
-#define LIMIT_TO_AT_MOST(a, b) (*(a) = MIN(*(a),(b)))
-#define ENSURE_AT_LEAST(a, b) (*(a) = MAX(*(a),(b)))
+#define LIMIT_TO_AT_MOST(a, b) (*(a) = MIN(*(a), (b)))
+#define ENSURE_AT_LEAST(a, b) (*(a) = MAX(*(a), (b)))
 
-#define DEBUG_PRINTF(fmt, ...) pr_debug(fmt,  ##__VA_ARGS__)
+#define DEBUG_PRINTF(fmt, ...) pr_debug(fmt, ##__VA_ARGS__)
 
 #define assert(cond) BUG_ON(!(cond))
 
