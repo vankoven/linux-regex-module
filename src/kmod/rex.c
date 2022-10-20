@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: GPL-2.0
-// SPDX-FileCopyrightText: Copyright 2022 G-Core Labs S.A.
+/* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
+/* SPDX-FileCopyrightText: Copyright 2022 G-Core Labs S.A. */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
@@ -230,8 +230,8 @@ static ssize_t rexcfg_database_read(struct config_item *item, void *outbuf,
 			ret = 0;
 	} else if (size > 0) {
 		/* In second call fill the buffer with data.
-         * We have to check size again to avoid races.
-         */
+		 * We have to check size again to avoid races.
+		 */
 		if (hs_database_size(patterns(db), &ret) || ret != size) {
 			ret = -ETXTBSY;
 			goto out;
@@ -538,4 +538,4 @@ module_exit(rex_exit);
 /* Module information */
 MODULE_AUTHOR("Sergey Nizovtsev, sn@tempesta-tech.com");
 MODULE_DESCRIPTION("Hyperscan regex engine");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("Dual BSD/GPL");

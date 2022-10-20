@@ -1,4 +1,22 @@
-# Hyperscan
+# eBPF REGEX helper
+
+The `linux-rex` is a loadable kernel module providing eBPF helper functions
+for processing regular expressions. It uses Hyperscan as a runtime and
+configuration tool.
+
+License: GPLv2
+
+## Documentation
+
+Refer to [the project wiki pages](https://github.com/G-Core/linux-regex-module/wiki)
+to find all the necessary documentation.
+
+## Talks and videos
+
+The `linux-rex` module [was introduced on the Netdev 0x16, Technical Conference
+on Linux Networking](https://netdevconf.info/0x16/session.html?When-regular-expressions-meet-XDP#)
+
+## Hyperscan
 
 Hyperscan is a high-performance multiple regex matching library. It follows the
 regular expression syntax of the commonly-used libpcre library, but is a
@@ -10,34 +28,7 @@ matching of regular expressions across streams of data.
 
 Hyperscan is typically used in a DPI library stack.
 
-# Documentation
+More information can be found at
+[Hyperscan project repo](https://github.com/intel/hyperscan)
 
-Information on building the Hyperscan library and using its API is available in
-the [Developer Reference Guide](http://intel.github.io/hyperscan/dev-reference/).
-
-# License
-
-Hyperscan is licensed under the BSD License. See the LICENSE file in the
-project repository.
-
-# Versioning
-
-The `master` branch on Github will always contain the most recent release of
-Hyperscan. Each version released to `master` goes through QA and testing before
-it is released; if you're a user, rather than a developer, this is the version
-you should be using.
-
-Further development towards the next release takes place on the `develop`
-branch.
-
-# Get Involved
-
-The official homepage for Hyperscan is at [www.hyperscan.io](https://www.hyperscan.io).
-
-If you have questions or comments, we encourage you to [join the mailing
-list](https://lists.01.org/mailman/listinfo/hyperscan). Bugs can be filed by
-sending email to the list, or by creating an issue on Github.
-
-If you wish to contact the Hyperscan team at Intel directly, without posting
-publicly to the mailing list, send email to
-[hyperscan@intel.com](mailto:hyperscan@intel.com).
+License: BSD
