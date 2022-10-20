@@ -39,7 +39,7 @@ static inline hs_database_t *patterns(struct rex_database *db)
 {
 	if (!db)
 		return NULL;
-	return (hs_database_t *) db->bytes;
+	return (hs_database_t *)db->bytes;
 }
 
 /**
@@ -68,17 +68,14 @@ struct rex_scan_ctx {
 	size_t block_len;
 };
 
-static int rex_scan_cb(unsigned int expression,
-		       unsigned long long from,
-		       unsigned long long to,
-		       unsigned int flags,
-		       void *raw_ctx)
+static int rex_scan_cb(unsigned int expression, unsigned long long from,
+		       unsigned long long to, unsigned int flags, void *raw_ctx)
 {
 	struct rex_scan_ctx *ctx = raw_ctx;
 	struct rex_scan_attr *attr = ctx->attr;
 	u32 features = attr->handler_flags;
 
-	attr->last_event = (struct rex_event) {
+	attr->last_event = (struct rex_event){
 		.expression = expression,
 		.from = from,
 		.to = to,
@@ -91,8 +88,7 @@ static int rex_scan_cb(unsigned int expression,
 	return (features & REX_SINGLE_SHOT) ? 1 : 0;
 }
 
-int bpf_scan_bytes(const void *buf, __u32 buf__sz,
-		   struct rex_scan_attr *attr)
+int bpf_scan_bytes(const void *buf, __u32 buf__sz, struct rex_scan_attr *attr)
 {
 	struct rex_scan_ctx ctx = {
 		.attr = attr,
@@ -120,8 +116,8 @@ int bpf_scan_bytes(const void *buf, __u32 buf__sz,
 	scratch = this_cpu_ptr(db->scratch);
 
 	kernel_fpu_begin();
-	err = hs_scan(patterns(db), buf, buf__sz, 0, scratch,
-		      rex_scan_cb, &ctx);
+	err = hs_scan(patterns(db), buf, buf__sz, 0, scratch, rex_scan_cb,
+		      &ctx);
 	kernel_fpu_end();
 
 	switch (err) {
@@ -135,7 +131,7 @@ int bpf_scan_bytes(const void *buf, __u32 buf__sz,
 	case HS_INVALID:
 	case HS_UNKNOWN_ERROR:
 	default:
-		WARN(1, "hs_scan() failed with code %d\n", (int) err);
+		WARN(1, "hs_scan() failed with code %d\n", (int)err);
 		return -EFAULT;
 	}
 }
@@ -178,7 +174,7 @@ static void *bpf_xdp_pointer(const struct xdp_buff *xdp, u32 offset, u32 len)
 	for (i = 0; i < sinfo->nr_frags; i++) { /* paged area */
 		u32 frag_size = skb_frag_size(&sinfo->frags[i]);
 
-		if  (offset < frag_size) {
+		if (offset < frag_size) {
 			addr = skb_frag_address(&sinfo->frags[i]);
 			size = frag_size;
 			break;
@@ -193,7 +189,7 @@ out:
 int bpf_xdp_scan_bytes(const struct xdp_md *xdp_md, u32 offset, u32 len,
 		       struct rex_scan_attr *scan_attr)
 {
-	struct xdp_buff *xdp = (struct xdp_buff *) xdp_md;
+	struct xdp_buff *xdp = (struct xdp_buff *)xdp_md;
 	void *ptr = bpf_xdp_pointer(xdp, offset, len);
 
 	if (IS_ERR(ptr))
@@ -214,13 +210,11 @@ static DEFINE_KFUNC_BTF_ID_SET(&rex_kfunc_ids, rex_kfunc_btf_set);
 
 static struct rex_policy *to_policy(struct config_item *item)
 {
-	return item ?
-		container_of(item, struct rex_policy, item) :
-		NULL;
+	return item ? container_of(item, struct rex_policy, item) : NULL;
 }
 
-static ssize_t rexcfg_database_read(struct config_item *item,
-				    void *outbuf, size_t size)
+static ssize_t rexcfg_database_read(struct config_item *item, void *outbuf,
+				    size_t size)
 {
 	struct rex_policy *rex = to_policy(item);
 	struct rex_database *db;
@@ -236,8 +230,8 @@ static ssize_t rexcfg_database_read(struct config_item *item,
 			ret = 0;
 	} else if (size > 0) {
 		/* In second call fill the buffer with data.
-		 * We have to check size again to avoid races.
-		 */
+         * We have to check size again to avoid races.
+         */
 		if (hs_database_size(patterns(db), &ret) || ret != size) {
 			ret = -ETXTBSY;
 			goto out;
@@ -378,7 +372,7 @@ static ssize_t rexcfg_id_store(struct config_item *item, const char *str,
 		goto out;
 	}
 
-	ret = idr_alloc(&rex_idr, rex, new_id, new_id+1, GFP_KERNEL);
+	ret = idr_alloc(&rex_idr, rex, new_id, new_id + 1, GFP_KERNEL);
 	if (ret < 0)
 		goto out;
 
@@ -446,21 +440,20 @@ static void rexcfg_item_release(struct config_item *item)
 }
 
 static const struct config_item_type rex_type = {
-	.ct_owner		= THIS_MODULE,
-	.ct_attrs		= (struct configfs_attribute*[]) {
-		&rexcfg_attr_id,
-		&rexcfg_attr_info,
-		&rexcfg_attr_epoch,
-		&rexcfg_attr_note,
-		NULL
-	},
-	.ct_bin_attrs		= (struct configfs_bin_attribute*[]) {
-		&rexcfg_attr_database,
-		NULL,
-	},
-	.ct_item_ops		= &(struct configfs_item_operations) {
-		.release	= rexcfg_item_release,
-	}
+	.ct_owner = THIS_MODULE,
+	.ct_attrs = (struct configfs_attribute *[]){ &rexcfg_attr_id,
+						     &rexcfg_attr_info,
+						     &rexcfg_attr_epoch,
+						     &rexcfg_attr_note, NULL },
+	.ct_bin_attrs =
+		(struct configfs_bin_attribute *[]){
+			&rexcfg_attr_database,
+			NULL,
+		},
+	.ct_item_ops =
+		&(struct configfs_item_operations){
+			.release = rexcfg_item_release,
+		}
 };
 
 static struct config_item *rex_make_item(struct config_group *group,
@@ -492,20 +485,23 @@ static struct config_item *rex_make_item(struct config_group *group,
 }
 
 static const struct config_item_type rex_group_type = {
-	.ct_owner		= THIS_MODULE,
-	.ct_group_ops		= &(struct configfs_group_operations) {
-		.make_item	= rex_make_item,
-	},
+	.ct_owner = THIS_MODULE,
+	.ct_group_ops =
+		&(struct configfs_group_operations){
+			.make_item = rex_make_item,
+		},
 };
 
 static struct configfs_subsystem rex_configfs = {
-	.su_mutex		= __MUTEX_INITIALIZER(rex_configfs.su_mutex),
-	.su_group		= {
-		.cg_item	= {
-			.ci_namebuf	= "rex",
-			.ci_type	= &rex_group_type,
-		},
-	},
+    .su_mutex = __MUTEX_INITIALIZER(rex_configfs.su_mutex),
+    .su_group =
+        {
+            .cg_item =
+                {
+                    .ci_namebuf = "rex",
+                    .ci_type = &rex_group_type,
+                },
+        },
 };
 
 static void banner(void)
@@ -527,7 +523,6 @@ static int __init rex_init(void)
 	banner();
 	return 0;
 }
-
 
 static void __exit rex_exit(void)
 {
