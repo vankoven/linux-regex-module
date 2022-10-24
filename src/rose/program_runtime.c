@@ -779,6 +779,7 @@ int roseCheckMask32(const struct core_info *ci, const u8 *and_mask,
             }
             c_len = ci->len - offset;
             c_shift = 32 - c_len;
+            assert(c_len <= 32);
             copy_upto_64_bytes((u8 *)&data, ci->buf + offset, c_len);
         } else {
             data = loadu256(ci->buf + offset);
@@ -921,6 +922,7 @@ u64a getBufferDataComplex(const struct core_info *ci, const s64a loc,
             }
             c_len = ci->len - loc;
             c_shift = data_len - c_len;
+            assert(c_len <= data_len);
             copy_upto_64_bytes(data, ci->buf + loc, c_len);
         } else {
 #ifdef HAVE_AVX512
@@ -2154,8 +2156,8 @@ hwlmcb_rv_t roseRunProgram(const struct RoseEngine *t,
     DEBUG_PRINTF("program=%u, offsets [%llu,%llu], flags=%u\n", programOffset,
                  som, end, prog_flags);
 
-    assert(programOffset != ROSE_INVALID_PROG_OFFSET);
-    assert(programOffset >= sizeof(struct RoseEngine));
+    if (programOffset != ROSE_INVALID_PROG_OFFSET)
+        assert(programOffset >= sizeof(struct RoseEngine));
     assert(programOffset < t->size);
 
     const char in_anchored = prog_flags & ROSE_PROG_FLAG_IN_ANCHORED;
@@ -2175,8 +2177,6 @@ hwlmcb_rv_t roseRunProgram(const struct RoseEngine *t,
     int work_done = 0;
 
     struct RoseContext *tctxt = &scratch->tctxt;
-
-    assert(*(const u8 *)pc != ROSE_INSTR_END);
 
 #if !defined(_WIN32)
     static const void *next_instr[] = {

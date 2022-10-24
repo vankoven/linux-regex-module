@@ -1,0 +1,17 @@
+Source: linux-rex
+Section: kernel
+Priority: optional
+Maintainer: Ivan Koveshnikov <ivan.koveshnikov@gcore.com>
+Build-Depends: debhelper-compat (= 13), dkms
+Standards-Version: 4.6.0
+Homepage: https://github.com/G-Core/linux-regex-module/
+Rules-Requires-Root: no
+
+Package: rex-dkms
+Architecture: all
+Depends: dwarves, zstd, ${misc:Depends}
+Description: Hyperscan loadable module for linux.
+  .
+  A eBPF helper to process regular expressions inside eBPF context.
+  Only a patched Linux kernel 5.17 is supported only.
+  Refer to https://github.com/G-Core/linux-regex-module/ for more documentation.

@@ -44,7 +44,11 @@
 #include "util/arch.h"
 #include "util/intrinsics.h"
 
+#ifndef __KERNEL__
 #include <string.h> // for memcpy
+#else
+#include <linux/string.h>
+#endif
 
 // Define a common assume_aligned using an appropriate compiler built-in, if
 // it's available. Note that we need to handle C or C++ compilation.

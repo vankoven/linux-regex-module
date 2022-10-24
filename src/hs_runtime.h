@@ -29,7 +29,11 @@
 #ifndef HS_RUNTIME_H_
 #define HS_RUNTIME_H_
 
+#ifndef __KERNEL__
 #include <stdlib.h>
+#else
+#include <linux/types.h>
+#endif
 
 /**
  * @file
@@ -575,6 +579,21 @@ hs_error_t HS_CDECL hs_alloc_scratch(const hs_database_t *db,
  */
 hs_error_t HS_CDECL hs_clone_scratch(const hs_scratch_t *src,
                                      hs_scratch_t **dest);
+
+/**
+ * Like @ref hs_clone_scratch() but writes to a preallocated buffer.
+ *
+ * @param src
+ *      The existing @ref hs_scratch_t to be cloned.
+ *
+ * @param dest
+ *      A pointer where scratch space should be initialized.
+ *
+ * @return
+ *      @ref HS_SUCCESS on success;
+ *      @ref HS_INVALID if dest is NULL or badly aligned.
+ */
+hs_error_t HS_CDECL hs_init_scratch(const hs_scratch_t *src, hs_scratch_t *dest);
 
 /**
  * Provides the size of the given scratch space.

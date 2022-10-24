@@ -25,6 +25,15 @@ autojunk
 .libs
 bin
 
+# kernel binaries
+*.o.d
+*.cmd
+*.ko
+*.mod
+*.mod.c
+modules.order
+Module.symvers
+
 # Merge files created by git.
 *.orig
 

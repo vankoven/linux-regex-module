@@ -27,7 +27,11 @@
  */
 
 #include "util/join.h"
+#ifndef __KERNEL__
 #include <string.h>
+#else
+#include <linux/string.h>
+#endif
 
 /** \file
   * \brief Limex Execution Engine Or:
@@ -173,27 +177,27 @@ size_t RUN_ACCEL_FN(const STATE_T s, UNUSED const STATE_T accelMask,
         switch (limex_m->shiftCount) {                                         \
         case 8:                                                                \
             succ_m = OR_STATE(succ_m, NFA_EXEC_LIM_SHIFT(limex_m, curr_m, 7)); \
-            /* fallthrough */                                                  \
+            FALLTHROUGH;                                                       \
         case 7:                                                                \
             succ_m = OR_STATE(succ_m, NFA_EXEC_LIM_SHIFT(limex_m, curr_m, 6)); \
-            /* fallthrough */                                                  \
+            FALLTHROUGH;                                                       \
         case 6:                                                                \
             succ_m = OR_STATE(succ_m, NFA_EXEC_LIM_SHIFT(limex_m, curr_m, 5)); \
-            /* fallthrough */                                                  \
+            FALLTHROUGH;                                                       \
         case 5:                                                                \
             succ_m = OR_STATE(succ_m, NFA_EXEC_LIM_SHIFT(limex_m, curr_m, 4)); \
-            /* fallthrough */                                                  \
+            FALLTHROUGH;                                                       \
         case 4:                                                                \
             succ_m = OR_STATE(succ_m, NFA_EXEC_LIM_SHIFT(limex_m, curr_m, 3)); \
-            /* fallthrough */                                                  \
+            FALLTHROUGH;                                                       \
         case 3:                                                                \
             succ_m = OR_STATE(succ_m, NFA_EXEC_LIM_SHIFT(limex_m, curr_m, 2)); \
-            /* fallthrough */                                                  \
+            FALLTHROUGH;                                                       \
         case 2:                                                                \
             succ_m = OR_STATE(succ_m, NFA_EXEC_LIM_SHIFT(limex_m, curr_m, 1)); \
-            /* fallthrough */                                                  \
+            FALLTHROUGH;                                                       \
         case 1:                                                                \
-            /* fallthrough */                                                  \
+            FALLTHROUGH;                                                       \
         case 0:                                                                \
             ;                                                                  \
         }                                                                      \

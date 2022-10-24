@@ -30,8 +30,13 @@
  * \brief Functions for allocating and manipulating scratch space.
  */
 
+#ifndef __KERNEL__
 #include <stdlib.h>
 #include <string.h>
+#else
+#include <linux/types.h>
+#include <linux/string.h>
+#endif
 
 #include "allocator.h"
 #include "hs_internal.h"
@@ -117,19 +122,25 @@ hs_error_t alloc_scratch(const hs_scratch_t *proto, hs_scratch_t **scratch) {
 
     /* the struct plus the allocated stuff plus padding for cacheline
      * alignment */
-    const size_t alloc_size = sizeof(struct hs_scratch) + size + 256;
-    s_tmp = hs_scratch_alloc(alloc_size);
-    hs_error_t err = hs_check_alloc(s_tmp);
-    if (err != HS_SUCCESS) {
-        hs_scratch_free(s_tmp);
-        *scratch = NULL;
-        return err;
+    size_t alloc_size = sizeof(struct hs_scratch) + size + 256;
+    if (!*scratch) {
+        s_tmp = hs_scratch_alloc(alloc_size);
+        hs_error_t err = hs_check_alloc(s_tmp);
+        if (err != HS_SUCCESS) {
+            hs_scratch_free(s_tmp);
+            return err;
+        }
+
+        memset(s_tmp, 0, alloc_size);
+        s = ROUNDUP_PTR(s_tmp, 64);
+        DEBUG_PRINTF("allocated %zu bytes at %p but realigning to %p\n", alloc_size, s_tmp, s);
+        DEBUG_PRINTF("sizeof %zu\n", sizeof(struct hs_scratch));
+    } else {
+        s = *scratch;
+        assert(proto->scratchSize == alloc_size);
+        s_tmp = (hs_scratch_t *)s->scratch_alloc;
     }
 
-    memset(s_tmp, 0, alloc_size);
-    s = ROUNDUP_PTR(s_tmp, 64);
-    DEBUG_PRINTF("allocated %zu bytes at %p but realigning to %p\n", alloc_size, s_tmp, s);
-    DEBUG_PRINTF("sizeof %zu\n", sizeof(struct hs_scratch));
     *s = *proto;
 
     s->magic = SCRATCH_MAGIC;
@@ -371,6 +382,7 @@ hs_error_t HS_CDECL hs_alloc_scratch(const hs_database_t *db,
     if (resize) {
         if (*scratch) {
             hs_scratch_free((*scratch)->scratch_alloc);
+            *scratch = NULL;
         }
 
         hs_error_t alloc_ret = alloc_scratch(proto, scratch);
@@ -404,6 +416,17 @@ hs_error_t HS_CDECL hs_clone_scratch(const hs_scratch_t *src,
 
     assert(!(*dest)->in_use);
     return HS_SUCCESS;
+}
+
+HS_PUBLIC_API
+hs_error_t HS_CDECL hs_init_scratch(const hs_scratch_t *src, hs_scratch_t *dest) {
+    if (!src || !ISALIGNED_CL(src) || src->magic != SCRATCH_MAGIC)
+        return HS_INVALID;
+    if (!dest || !ISALIGNED_CL(dest))
+        return HS_INVALID;
+
+    memset(dest, 0, src->scratchSize);
+    return alloc_scratch(src, &dest);
 }
 
 HS_PUBLIC_API

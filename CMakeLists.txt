@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.8.11)
+cmake_minimum_required (VERSION 3.12)
 project (hyperscan C CXX)
 
 set (HS_MAJOR_VERSION 5)
@@ -505,7 +505,7 @@ if (NOT WIN32)
     endforeach()
 
     configure_file(libhs.pc.in libhs.pc @ONLY) # only replace @ quoted vars
-    install(FILES ${CMAKE_BINARY_DIR}/libhs.pc
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libhs.pc
         DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
 endif()
 
@@ -579,7 +579,7 @@ set (hs_exec_common_SRCS
 
 set (hs_exec_SRCS
     ${hs_HEADERS}
-    src/hs_version.h
+    ${PROJECT_BINARY_DIR}/hs_version.h
     src/ue2common.h
     src/allocator.h
     src/crc32.c
@@ -730,13 +730,13 @@ set (hs_exec_avx2_SRCS
 
 SET (hs_compile_SRCS
     ${hs_HEADERS}
+    ${PROJECT_BINARY_DIR}/hs_version.h
     src/crc32.h
     src/database.h
     src/grey.cpp
     src/grey.h
     src/hs.cpp
     src/hs_internal.h
-    src/hs_version.h
     src/scratch.h
     src/state.h
     src/ue2common.h
@@ -1412,3 +1412,5 @@ option(BUILD_EXAMPLES "Build Hyperscan example code (default TRUE)" TRUE)
 if(NOT WIN32 AND BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
+
+option(TEST_XDPSCAN "Build Hyperscan unit tests for XDP module" FALSE)

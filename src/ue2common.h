@@ -38,12 +38,22 @@
 
 #include "config.h"
 
+#ifndef __KERNEL__
+
 /* standard types used across ue2 */
 
 // We use the size_t type all over the place, usually defined in stddef.h.
 #include <stddef.h>
 // stdint.h for things like uintptr_t and friends
 #include <stdint.h>
+
+#if defined(__cplusplus)
+# define FALLTHROUGH                    [[fallthrough]]
+#elif !defined(_WIN32) && __has_attribute(__fallthrough__)
+# define FALLTHROUGH                    __attribute__((__fallthrough__))
+#else
+# define FALLTHROUGH                    do {} while (0)  /* fallthrough */
+#endif
 
 /* ick */
 #if defined(_WIN32)
@@ -227,5 +237,9 @@ typedef u32 ReportID;
 #endif
 
 #include <assert.h>
+
+#else
+#include "ue2common_kern.h"
+#endif
 
 #endif

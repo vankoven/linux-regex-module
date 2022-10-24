@@ -35,7 +35,11 @@
 #include "util/multibit_compress.h"
 #include "util/uniform_ops.h"
 
+#ifndef __KERNEL__
 #include <string.h>
+#else
+#include <linux/string.h>
+#endif
 
 #define COPY_IN(p, sz) do {                             \
         assert(currOffset + sz <= buf_size);            \

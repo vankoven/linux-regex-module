@@ -35,6 +35,7 @@
 #include <cstring>
 #include <ctype.h>
 #include <string>
+#include <vector>
 
 #if defined(HAVE_SIGACTION) || defined(_WIN32)
 #include <signal.h>
@@ -174,12 +175,9 @@ void installSignalHandler(void) {
 #endif // HAVE_SIGACTION
 }
 
-#ifdef HAVE_SIGALTSTACK
-static TLS_VARIABLE char alt_stack_loc[SIGSTKSZ];
-#endif
-
 void setSignalStack(void) {
 #ifdef HAVE_SIGALTSTACK
+    static TLS_VARIABLE std::vector<char> alt_stack_loc(SIGSTKSZ);
     struct sigaction act;
     memset(&act, 0, sizeof(act));
     act.sa_handler = sighandler;
@@ -188,7 +186,7 @@ void setSignalStack(void) {
     memset(&alt_stack, 0, sizeof(alt_stack));
     alt_stack.ss_flags = 0;
     alt_stack.ss_size = SIGSTKSZ;
-    alt_stack.ss_sp = alt_stack_loc;
+    alt_stack.ss_sp = alt_stack_loc.data();
     if (!sigaltstack(&alt_stack, nullptr)) {
         act.sa_flags |= SA_ONSTACK;
     }

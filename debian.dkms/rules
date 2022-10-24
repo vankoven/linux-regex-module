@@ -1,0 +1,25 @@
+#!/usr/bin/make -f
+#export DH_VERBOSE = 1
+
+include /usr/share/dpkg/pkg-info.mk
+
+export DKMS_DIR=usr/src/${DEB_SOURCE}-${DEB_VERSION}
+
+%:
+	dh $@ --with dkms
+
+override_dh_auto_configure:
+	@echo NO AUTO CONFIGURE
+
+override_dh_auto_clean:
+	@echo CLEAN
+
+override_dh_auto_build:
+	@echo NO BUILD
+
+override_dh_auto_install:
+	@echo NO AUTO INSTALL
+
+override_dh_dkms:
+	dh_install
+	dh_dkms -V $(DEB_VERSION)

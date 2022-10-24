@@ -39,7 +39,11 @@
 #include "popcount.h"
 #include "state_compress.h"
 
+#ifndef __KERNEL__
 #include <string.h>
+#else
+#include <linux/string.h>
+#endif
 
 /*
  * 32-bit store/load.

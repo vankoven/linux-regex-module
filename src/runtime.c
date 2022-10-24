@@ -30,8 +30,13 @@
  * \brief Runtime functions.
  */
 
+#ifndef __KERNEL__
 #include <stdlib.h>
 #include <string.h>
+#else
+#include <linux/types.h>
+#include <linux/string.h>
+#endif
 
 #include "allocator.h"
 #include "hs_compile.h" /* for HS_MODE_* flags */
@@ -413,8 +418,6 @@ hs_error_t HS_CDECL hs_scan(const hs_database_t *db, const char *data,
     }
 
     switch (rose->runtimeImpl) {
-    default:
-        assert(0);
     case ROSE_RUNTIME_FULL_ROSE:
         rawBlockExec(rose, scratch);
         break;
@@ -424,6 +427,8 @@ hs_error_t HS_CDECL hs_scan(const hs_database_t *db, const char *data,
     case ROSE_RUNTIME_SINGLE_OUTFIX:
         soleOutfixBlockExec(rose, scratch);
         break;
+    default:
+        assert(0);
     }
 
 done_scan:
@@ -680,14 +685,14 @@ void report_eod_matches(hs_stream_t *id, hs_scratch_t *scratch,
         if (rose->requiresEodCheck) {
             switch (rose->runtimeImpl) {
             default:
-            case ROSE_RUNTIME_PURE_LITERAL:
-                assert(0);
             case ROSE_RUNTIME_FULL_ROSE:
                 rawEodExec(id, scratch);
                 break;
             case ROSE_RUNTIME_SINGLE_OUTFIX:
                 soleOutfixEodExec(id, scratch);
                 break;
+            case ROSE_RUNTIME_PURE_LITERAL:
+                assert(0);
             }
         }
     }
@@ -939,8 +944,6 @@ hs_error_t hs_scan_stream_internal(hs_stream_t *id, const char *data,
     }
 
     switch (rose->runtimeImpl) {
-    default:
-        assert(0);
     case ROSE_RUNTIME_FULL_ROSE:
         rawStreamExec(id, scratch);
         break;
@@ -949,6 +952,9 @@ hs_error_t hs_scan_stream_internal(hs_stream_t *id, const char *data,
         break;
     case ROSE_RUNTIME_SINGLE_OUTFIX:
         soleOutfixStreamExec(id, scratch);
+        break;
+    default:
+        assert(0);
     }
 
     if (rose->hasSom && !told_to_stop_matching(scratch)) {
@@ -1092,12 +1098,12 @@ void dumpData(const char *data, size_t len) {
     for (size_t i = 0; i < len; i++) {
         u8 c = data[i];
         if (ourisprint(c) && c != '\'') {
-            printf("%c", c);
+            DEBUG_PRINTF("%c", c);
         } else {
-            printf("\\x%02x", c);
+            DEBUG_PRINTF("\\x%02x", c);
         }
     }
-    printf("\n");
+    DEBUG_PRINTF("\n");
 }
 #endif
 

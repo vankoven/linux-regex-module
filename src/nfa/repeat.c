@@ -40,8 +40,15 @@
 #include "util/partial_store.h"
 #include "util/unaligned.h"
 
+#ifndef __KERNEL__
 #include <stdint.h>
 #include <string.h>
+#else
+#include <linux/types.h>
+#include <linux/string.h>
+#include <linux/limits.h>
+#define UINT32_MAX U32_MAX
+#endif
 
 /** \brief Returns the total capacity of the ring.
  * Note that it's currently one greater than repeatMax so that we can handle

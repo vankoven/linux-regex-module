@@ -41,13 +41,6 @@ using namespace testing;
 
 namespace /* anonymous */ {
 
-// Dummy callback: does nothing, returns 0 (keep matching)
-int dummyHandler(unsigned, unsigned long long, unsigned long long,
-                 unsigned, void *) {
-    // empty
-    return 0;
-}
-
 unsigned lastMatchId = 0;
 unsigned long long lastMatchFrom = 0;
 unsigned long long lastMatchTo = 0;
@@ -66,20 +59,6 @@ int singleHandler(unsigned id, unsigned long long from,
 }
 
 unsigned matchCount = 0;
-
-// Counter callback: just counts the number of calls
-int countHandler(unsigned, unsigned long long, unsigned long long,
-                 unsigned, void *) {
-    matchCount++;
-    return 0;
-}
-
-// Stop handler: take one match and tell Hyperscan to not deliver any more.
-int stopHandler(unsigned, unsigned long long, unsigned long long,
-                unsigned, void *) {
-    matchCount++;
-    return 1;
-}
 
 // Can we scan 5GB of data (pushing past the uint32_t limit)
 TEST(HyperscanTestBehaviour, ScanSeveralGigabytesNoMatch) {
@@ -110,11 +89,11 @@ TEST(HyperscanTestBehaviour, ScanSeveralGigabytesNoMatch) {
 
     while (megabytes-- > 0) {
         err = hs_scan_stream(stream, data.data(), data.size(), 0, scratch,
-                             dummyHandler, nullptr);
+                             dummy_cb, nullptr);
         ASSERT_EQ(HS_SUCCESS, err);
     }
 
-    err = hs_close_stream(stream, scratch, dummyHandler, nullptr);
+    err = hs_close_stream(stream, scratch, dummy_cb, nullptr);
     ASSERT_EQ(HS_SUCCESS, err);
 
     // teardown
@@ -340,15 +319,15 @@ TEST(HyperscanTestBehaviour, StreamingThereCanBeOnlyOne) {
 
     matchCount = 0;
     err = hs_scan_stream(stream, data1.c_str(), data1.size(), 0, scratch,
-                         countHandler, nullptr);
+                         count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1U, matchCount); // only one match
     err = hs_scan_stream(stream, data2.c_str(), data2.size(), 0, scratch,
-                         countHandler, nullptr);
+                         count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1U, matchCount); // just the one from the first call above
 
-    err = hs_close_stream(stream, scratch, countHandler, nullptr);
+    err = hs_close_stream(stream, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
 
     // teardown
@@ -378,7 +357,7 @@ TEST(HyperscanTestBehaviour, BlockThereCanBeOnlyOne) {
     EXPECT_TRUE(scratch != nullptr);
 
     matchCount = 0;
-    err = hs_scan(db, data1.c_str(), data1.size(), 0, scratch, countHandler, nullptr);
+    err = hs_scan(db, data1.c_str(), data1.size(), 0, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1U, matchCount); // only one match
 
@@ -419,13 +398,13 @@ TEST_P(HyperscanLiteralLengthTest, FloatingBlock) {
     EXPECT_TRUE(scratch != nullptr);
 
     matchCount = 0;
-    err = hs_scan(db, data.c_str(), data.size(), 0, scratch, countHandler, nullptr);
+    err = hs_scan(db, data.c_str(), data.size(), 0, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(5U, matchCount); // five matches
 
     // Should see no match from five bytes in
     matchCount = 0;
-    err = hs_scan(db, data.c_str() + 5, data.size() - 5, 0, scratch, countHandler, nullptr);
+    err = hs_scan(db, data.c_str() + 5, data.size() - 5, 0, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(0U, matchCount); // no matches
 
@@ -457,13 +436,13 @@ TEST_P(HyperscanLiteralLengthTest, AnchoredBlock) {
     EXPECT_TRUE(scratch != nullptr);
 
     matchCount = 0;
-    err = hs_scan(db, data.c_str(), data.size(), 0, scratch, countHandler, nullptr);
+    err = hs_scan(db, data.c_str(), data.size(), 0, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1U, matchCount); // one match
 
     // Should see no match from five bytes in
     matchCount = 0;
-    err = hs_scan(db, data.c_str() + 5, data.size() - 5, 0, scratch, countHandler, nullptr);
+    err = hs_scan(db, data.c_str() + 5, data.size() - 5, 0, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(0U, matchCount); // no matches
 
@@ -507,7 +486,7 @@ TEST_P(CallbackReturnStop, Block) {
 
     matchCount = 0;
     err = hs_scan(db, params.corpus, strlen(params.corpus), 0, scratch,
-                  stopHandler, nullptr);
+                  terminate_cb, &matchCount);
     ASSERT_EQ(1U, matchCount) << "One match exactly should be recorded.";
     ASSERT_EQ(HS_SCAN_TERMINATED, err);
 
@@ -543,11 +522,11 @@ TEST_P(CallbackReturnStop, Streaming) {
     matchCount = 0;
 
     err = hs_scan_stream(stream, params.corpus, strlen(params.corpus),
-                         0, scratch, stopHandler, nullptr);
+                         0, scratch, terminate_cb, &matchCount);
     ASSERT_EQ(1U, matchCount) << "One match exactly should be recorded.";
     ASSERT_EQ(HS_SCAN_TERMINATED, err);
 
-    err = hs_close_stream(stream, scratch, stopHandler, nullptr);
+    err = hs_close_stream(stream, scratch, terminate_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
 
     // teardown
@@ -579,7 +558,7 @@ TEST_P(CallbackReturnStop, Vectored) {
     const char *data[] = { params.corpus };
     unsigned int len[] = { (unsigned int)strlen(params.corpus) };
 
-    err = hs_scan_vector(db, data, len, 1, 0, scratch, stopHandler, nullptr);
+    err = hs_scan_vector(db, data, len, 1, 0, scratch, terminate_cb, &matchCount);
     ASSERT_EQ(1U, matchCount) << "One match exactly should be recorded.";
     ASSERT_EQ(HS_SCAN_TERMINATED, err);
 
@@ -844,11 +823,11 @@ TEST(HyperscanTestBehaviour, CloseStreamMatch) {
     matchCount = 0;
     const string data("foo        bar");
     err = hs_scan_stream(stream, data.c_str(), data.size(), 0, scratch,
-                         countHandler, nullptr);
+                         count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(0U, matchCount); // hasn't matched until stream end
 
-    err = hs_close_stream(stream, scratch, countHandler, nullptr);
+    err = hs_close_stream(stream, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1U, matchCount); // our match was returned
 
@@ -885,7 +864,7 @@ TEST(HyperscanTestBehaviour, NoMainCB) {
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(0U, matchCount); // hasn't matched until stream end
 
-    err = hs_close_stream(stream, scratch, countHandler, nullptr);
+    err = hs_close_stream(stream, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1U, matchCount); // our match was returned
 
@@ -919,7 +898,7 @@ TEST(HyperscanTestBehaviour, CloseStreamNoMatch) {
     matchCount = 0;
     const string data("foo        bar");
     err = hs_scan_stream(stream, data.c_str(), data.size(), 0, scratch,
-                         countHandler, nullptr);
+                         count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(0U, matchCount); // hasn't matched until stream end
 
@@ -955,11 +934,11 @@ TEST(HyperscanTestBehaviour, CloseStreamAfterTermination) {
     matchCount = 0;
     const string data("foo        bar     baz");
     err = hs_scan_stream(stream, data.c_str(), data.size(), 0, scratch,
-                         stopHandler, nullptr);
+                         terminate_cb, &matchCount);
     ASSERT_EQ(HS_SCAN_TERMINATED, err);
     EXPECT_EQ(1U, matchCount); // after "bar"
 
-    err = hs_close_stream(stream, scratch, stopHandler, nullptr);
+    err = hs_close_stream(stream, scratch, terminate_cb, &matchCount);
     EXPECT_EQ(1U, matchCount); // no match for baz
     ASSERT_EQ(HS_SUCCESS, err);
 
@@ -987,7 +966,7 @@ TEST(HyperscanTestBehaviour, Vectored1) {
     unsigned int len[] = { 3, 3, 3};
 
     matchCount = 0;
-    err = hs_scan_vector(db, data, len, 3, 0, scratch, countHandler, nullptr);
+    err = hs_scan_vector(db, data, len, 3, 0, scratch, count_cb, &matchCount);
 
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1U, matchCount);
@@ -1016,7 +995,7 @@ TEST(HyperscanTestBehaviour, Vectored2) {
     unsigned int len[] = { 0, 3, 3, 3};
 
     matchCount = 0;
-    err = hs_scan_vector(db, data, len, 4, 0, scratch, countHandler, nullptr);
+    err = hs_scan_vector(db, data, len, 4, 0, scratch, count_cb, &matchCount);
 
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1U, matchCount);
@@ -1045,7 +1024,7 @@ TEST(HyperscanTestBehaviour, Vectored3) {
     unsigned int len[] = { 3, 3, 0, 3};
 
     matchCount = 0;
-    err = hs_scan_vector(db, data, len, 4, 0, scratch, countHandler, nullptr);
+    err = hs_scan_vector(db, data, len, 4, 0, scratch, count_cb, &matchCount);
 
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1U, matchCount);
@@ -1074,7 +1053,7 @@ TEST(HyperscanTestBehaviour, Vectored4) {
     unsigned int len[] = { 3, 3, 3, 0};
 
     matchCount = 0;
-    err = hs_scan_vector(db, data, len, 4, 0, scratch, countHandler, nullptr);
+    err = hs_scan_vector(db, data, len, 4, 0, scratch, count_cb, &matchCount);
 
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1U, matchCount);
@@ -1103,7 +1082,7 @@ TEST(HyperscanTestBehaviour, Vectored5) {
     unsigned int len[] = { 0, 3, 3, 3};
 
     matchCount = 0;
-    err = hs_scan_vector(db, data, len, 0, 0, scratch, countHandler, nullptr);
+    err = hs_scan_vector(db, data, len, 0, 0, scratch, count_cb, &matchCount);
 
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(0U, matchCount);
@@ -1132,7 +1111,7 @@ TEST(HyperscanTestBehaviour, Vectored6) {
     unsigned int len[] = { 0, 3, 3, 3};
 
     matchCount = 0;
-    err = hs_scan_vector(db, data, len, 0, 0, scratch, countHandler, nullptr);
+    err = hs_scan_vector(db, data, len, 0, 0, scratch, count_cb, &matchCount);
 
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1U, matchCount);
@@ -1161,7 +1140,7 @@ TEST(HyperscanTestBehaviour, Vectored7) {
     unsigned int len[] = { 0, 3, 3, 3};
 
     matchCount = 0;
-    err = hs_scan_vector(db, data, len, 0, 0, scratch, countHandler, nullptr);
+    err = hs_scan_vector(db, data, len, 0, 0, scratch, count_cb, &matchCount);
 
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1U, matchCount);
@@ -1198,7 +1177,7 @@ TEST(HyperscanTestBehaviour, MultiStream1) {
     matchCount = 0;
     const string data("foo        bara");
     err = hs_scan_stream(stream, data.c_str(), data.size(), 0, scratch,
-                         countHandler, nullptr);
+                         count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(0U, matchCount); // hasn't matched until stream end
 
@@ -1208,11 +1187,11 @@ TEST(HyperscanTestBehaviour, MultiStream1) {
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(0U, matchCount);
 
-    err = hs_close_stream(stream, scratch, countHandler, nullptr);
+    err = hs_close_stream(stream, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1U, matchCount);
 
-    err = hs_close_stream(stream2, scratch, countHandler, nullptr);
+    err = hs_close_stream(stream2, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1U, matchCount);
 
@@ -1254,15 +1233,15 @@ TEST(HyperscanTestBehaviour, MultiStream2) {
 
     const string data("foo        bara");
     err = hs_scan_stream(stream, data.c_str(), data.size(), 0, scratch,
-                         countHandler, nullptr);
+                         count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(0U, matchCount); // hasn't matched until stream end
 
-    err = hs_close_stream(stream2, scratch, countHandler, nullptr);
+    err = hs_close_stream(stream2, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(0U, matchCount);
 
-    err = hs_close_stream(stream, scratch, countHandler, nullptr);
+    err = hs_close_stream(stream, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1U, matchCount);
 
@@ -1526,7 +1505,7 @@ TEST(PcreSpace, NewPcre) {
     EXPECT_TRUE(scratch != nullptr);
 
     matchCount = 0;
-    err = hs_scan(db, data.c_str(), data.size(), 0, scratch, countHandler, nullptr);
+    err = hs_scan(db, data.c_str(), data.size(), 0, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(data.size(), matchCount); // all are spaces
 
@@ -1552,7 +1531,7 @@ TEST(PcreSpace, NewPcreClass) {
     EXPECT_TRUE(scratch != nullptr);
 
     matchCount = 0;
-    err = hs_scan(db, data.c_str(), data.size(), 0, scratch, countHandler, nullptr);
+    err = hs_scan(db, data.c_str(), data.size(), 0, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(data.size(), matchCount); // all are spaces
 
@@ -1578,7 +1557,7 @@ TEST(PcreSpace, NewPcreNeg) {
     EXPECT_TRUE(scratch != nullptr);
 
     matchCount = 0;
-    err = hs_scan(db, data.c_str(), data.size(), 0, scratch, countHandler, nullptr);
+    err = hs_scan(db, data.c_str(), data.size(), 0, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(0, matchCount); // no matches, all are spaces
 
@@ -1604,7 +1583,7 @@ TEST(PcreSpace, NewPcreClassNeg) {
     EXPECT_TRUE(scratch != nullptr);
 
     matchCount = 0;
-    err = hs_scan(db, data.c_str(), data.size(), 0, scratch, countHandler, nullptr);
+    err = hs_scan(db, data.c_str(), data.size(), 0, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(0, matchCount); // no matches, all are spaces
 
@@ -1629,7 +1608,7 @@ TEST(Parser, NewlineTerminatedComment) {
     EXPECT_TRUE(scratch != nullptr);
 
     matchCount = 0;
-    err = hs_scan(db, data.c_str(), data.size(), 0, scratch, countHandler, nullptr);
+    err = hs_scan(db, data.c_str(), data.size(), 0, scratch, count_cb, &matchCount);
     ASSERT_EQ(HS_SUCCESS, err);
     EXPECT_EQ(1, matchCount);
 

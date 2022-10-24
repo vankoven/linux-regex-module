@@ -73,6 +73,45 @@ else()
 target_link_libraries(unit-hyperscan hs expressionutil)
 endif()
 
+if (TEST_XDPSCAN)
+
+find_package(LibBpf REQUIRED)
+if ("${LINUX_TOOLS_INCLUDE_DIR}" STREQUAL "")
+    message(FATAL_ERROR "Please set LINUX_TOOLS_INCLUDE_DIR")
+endif()
+
+set(unit_xdpscan_SOURCES
+    ${gtest_SOURCES}
+    hyperscan/test_util.cpp
+    hyperscan/extparam.cpp
+    hyperscan/arg_checks.cpp
+    hyperscan/behaviour.cpp
+    hyperscan/identical.cpp
+    hyperscan/literals.cpp
+    hyperscan/logical_combination.cpp
+    hyperscan/multi.cpp
+    hyperscan/single.cpp
+    hyperscan/order.cpp
+    hyperscan/xdp_scan.cpp
+    )
+add_executable(unit-xdpscan ${unit_xdpscan_SOURCES})
+target_link_options(unit-xdpscan
+    PRIVATE -Wl,--wrap=hs_scan)
+add_library(xdp-runner hyperscan/xdp_runner.c)
+target_include_directories(xdp-runner SYSTEM BEFORE
+    PRIVATE ${LINUX_TOOLS_INCLUDE_DIR} ${LIBBPF_INCLUDE_DIRS}
+    )
+
+if (BUILD_STATIC_AND_SHARED OR BUILD_SHARED_LIBS)
+    target_link_libraries(unit-xdpscan
+        hs_shared expressionutil xdp-runner ${LIBBPF_LIBRARIES})
+else()
+    #target_link_options(unit-xdpscan PRIVATE -static)
+    target_link_libraries(unit-xdpscan
+        hs expressionutil xdp-runner ${LIBBPF_LIBRARIES}
+        )
+endif()
+endif()
 
 if (NOT (RELEASE_BUILD OR FAT_RUNTIME))
 set(unit_internal_SOURCES

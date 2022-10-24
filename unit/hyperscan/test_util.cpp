@@ -48,6 +48,26 @@ int record_cb(unsigned id, unsigned long long, unsigned long long to,
     return (int)c->halt;
 }
 
+int dummy_cb(unsigned, unsigned long long, unsigned long long, unsigned,
+             void *) {
+    // empty
+    return 0;
+}
+
+int count_cb(unsigned, unsigned long long, unsigned long long, unsigned,
+             void *ctxt) {
+    size_t *count = (size_t *)ctxt;
+    (*count)++;
+    return 0;
+}
+
+int terminate_cb(unsigned, unsigned long long, unsigned long long, unsigned,
+             void *ctxt) {
+    size_t *count = (size_t *)ctxt;
+    (*count)++;
+    return 1;
+}
+
 std::ostream &operator<<(std::ostream &o, const MatchRecord &m) {
     return o << "[" << m.to << ", " << m.id << "]";
 }

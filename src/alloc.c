@@ -30,13 +30,35 @@
  * \brief Runtime functions for setting custom allocators.
  */
 
+#ifndef __KERNEL__
 #include <stdlib.h>
 #include <string.h>
+#else
+#include <linux/types.h>
+#include <linux/slab.h>
+#include <linux/preempt.h>
+#endif
 
 #include "allocator.h"
 
+#if !defined(__KERNEL__)
+
 #define default_malloc malloc
 #define default_free free
+
+#else
+
+static void *default_malloc(size_t size) {
+    WARN_ON_ONCE(in_serving_softirq());
+    return kmalloc(size, GFP_KERNEL);
+}
+
+static void default_free(void *ptr) {
+    WARN_ON_ONCE(in_serving_softirq());
+    return kfree(ptr);
+}
+
+#endif
 
 hs_alloc_t hs_database_alloc = default_malloc;
 hs_alloc_t hs_misc_alloc = default_malloc;
