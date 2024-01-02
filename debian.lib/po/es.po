@@ -1,0 +1,37 @@
+# Translation of hyperscan debconf templates to Spanish.
+# Copyright (C) 2023 Camaleón <noelamac@gmail.com>
+# This file is distributed under the same license as the hyperscan package.
+# Camaleón <noelamac@gmail.com>, 2023.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hyperscan\n"
+"Report-Msgid-Bugs-To: hyperscan@packages.debian.org\n"
+"POT-Creation-Date: 2016-07-26 23:46+0200\n"
+"PO-Revision-Date: 2023-05-12 15:57+0200\n"
+"Language-Team: Debian Spanish <debian-l10n-spanish@lists.debian.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.4.2\n"
+"Last-Translator: Camaleón <noelamac@gmail.com>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Language: es\n"
+
+#. Type: boolean
+#. Description
+#: ../libhyperscan5.templates:1001
+msgid "Really install package?"
+msgstr "¿Desea realmente instalar el paquete?"
+
+#. Type: boolean
+#. Description
+#: ../libhyperscan5.templates:1001
+msgid ""
+"This CPU lacks support for the Supplemental Streaming SIMD Extensions 3 "
+"(SSSE3) instruction set that is required to execute programs linked against "
+"hyperscan."
+msgstr ""
+"El procesador de su equipo no admite el conjunto de instrucciones "
+"Extensiones SIMD de streaming 3 (SSSE3) necesario para ejecutar programas "
+"enlazados con hyperscan."
