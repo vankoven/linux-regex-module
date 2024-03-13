@@ -1,6 +1,16 @@
 #!/usr/bin/make -f
 
-export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+# This option brings dpkg-buildflags with LTO, which breaks the fat runtime builds
+#export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+export DEB_CFLAGS_MAINT_STRIP = "-flto=auto -ffat-lto-objects"
+export DEB_CXXFLAGS_MAINT_STRIP = "-flto=auto -ffat-lto-objects"
+export DEB_CPPFLAGS_MAINT_STRIP = "-flto=auto -ffat-lto-objects"
+export DEB_LDFLAGS_MAINT_STRIP = "-flto=auto -ffat-lto-objects"
+export DEB_OBJCFLAGS_MAINT_STRIP = "-flto=auto -ffat-lto-objects"
+export DEB_OBJCXXFLAGS_MAINT_STRIP = "-flto=auto -ffat-lto-objects"
+
+include /usr/share/dpkg/buildflags.mk
 
 %:
 	dh $@ --buildsystem=cmake
