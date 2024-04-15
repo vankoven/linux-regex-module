@@ -287,8 +287,9 @@ static ssize_t rexcfg_database_write(struct config_item *item,
 	struct rex_policy *rex = to_policy(item);
 	struct rex_database *db;
 	hs_scratch_t *proto = NULL;
-	size_t alloc_size;
-	int cpu;
+	size_t alloc_size = 0;
+	int cpu, r;
+	char *info = NULL;
 
 	/* Drop existing database on empty write. */
 	if (nbytes == 0) {
@@ -298,14 +299,25 @@ static ssize_t rexcfg_database_write(struct config_item *item,
 		return nbytes;
 	}
 
-	if (hs_serialized_database_size(bytes, nbytes, &alloc_size))
+	r = hs_serialized_database_info(bytes, nbytes, &info);
+	pr_info("Hyperscan: importing database (rcode: %i): %s", r,
+		info ? info : "Error");
+	kfree(info);
+
+	r = hs_serialized_database_size(bytes, nbytes, &alloc_size);
+	if (r) {
+		pr_warn("Hyperscan: database size check failed with error %i",
+			r);
 		return -EIO;
+	}
 
 	db = kmalloc(sizeof(*db) + alloc_size, GFP_KERNEL);
 	if (!db)
 		return -ENOMEM;
 
-	if (hs_deserialize_database_at(bytes, nbytes, patterns(db))) {
+	r = hs_deserialize_database_at(bytes, nbytes, patterns(db));
+	if (r) {
+		pr_warn("Hyperscan: deserialisation failed with error %i", r);
 		kfree(db);
 		return -EINVAL;
 	}
