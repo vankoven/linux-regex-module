@@ -115,12 +115,13 @@ int bpf_scan_bytes(const void *buf, __u32 buf__sz, struct rex_scan_attr *attr)
 
 	scratch = this_cpu_ptr(db->scratch);
 
-	if (!WARN_ON_ONCE(!irq_fpu_usable())) {
-		kernel_fpu_begin();
-		err = hs_scan(patterns(db), buf, buf__sz, 0, scratch,
-			      rex_scan_cb, &ctx);
-		kernel_fpu_end();
-	} // TODO: Encode this situation into error code
+	if (WARN_ON_ONCE(!irq_fpu_usable()))
+		return -EBUSY;
+
+	kernel_fpu_begin();
+	err = hs_scan(patterns(db), buf, buf__sz, 0, scratch,
+				rex_scan_cb, &ctx);
+	kernel_fpu_end();
 
 	switch (err) {
 	case HS_DB_MODE_ERROR:
