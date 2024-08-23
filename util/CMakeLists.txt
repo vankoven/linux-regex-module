@@ -19,8 +19,14 @@ set(expressionutil_SRCS
     ExpressionParser.h
     ExpressionParser.cpp
     )
+set(expressionutil_HEADERS
+    expressions.h
+    ExpressionParser.h
+    )
 add_library(expressionutil STATIC ${expressionutil_SRCS})
 add_dependencies(expressionutil ragel_ExpressionParser)
+install(FILES ${expressionutil_HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hs")
+install(TARGETS expressionutil DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 SET(corpusomatic_SRCS
     ng_corpus_editor.h
