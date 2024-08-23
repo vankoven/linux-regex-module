@@ -15,3 +15,8 @@ Description: Hyperscan loadable module for linux.
   A eBPF helper to process regular expressions inside eBPF context.
   Only a patched Linux kernel 5.17 is supported only.
   Refer to https://github.com/G-Core/linux-regex-module/ for more documentation.
+
+Package: rex-dkms-dev
+Architecture: all
+Section: libdevel
+Description: Header files for eBPF programs using Hyperscan as a Linux kernel module.
