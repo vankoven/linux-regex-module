@@ -13,7 +13,7 @@ Depends: dwarves, zstd, ${misc:Depends}
 Description: Hyperscan loadable module for linux.
   .
   A eBPF helper to process regular expressions inside eBPF context.
-  Only a patched Linux kernel 5.17 is supported only.
+  Only Linux kernel > 6.1 is supported.
   Refer to https://github.com/G-Core/linux-regex-module/ for more documentation.
 
 Package: rex-dkms-dev

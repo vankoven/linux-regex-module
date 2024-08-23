@@ -202,11 +202,24 @@ int bpf_xdp_scan_bytes(const struct xdp_md *xdp_md, u32 offset, u32 len,
 }
 EXPORT_SYMBOL(bpf_xdp_scan_bytes);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
 BTF_SET_START(rex_kfunc_ids)
 BTF_ID(func, bpf_scan_bytes)
 BTF_ID(func, bpf_xdp_scan_bytes)
 BTF_SET_END(rex_kfunc_ids)
 static DEFINE_KFUNC_BTF_ID_SET(&rex_kfunc_ids, rex_kfunc_btf_set);
+#else
+
+BTF_SET8_START(rex_kfunc_ids)
+BTF_ID_FLAGS(func, bpf_scan_bytes)
+BTF_ID_FLAGS(func, bpf_xdp_scan_bytes)
+BTF_SET8_END(rex_kfunc_ids)
+
+static const struct btf_kfunc_id_set rex_kfunc_btf_set = {
+	.owner	= THIS_MODULE,
+	.set	= &rex_kfunc_ids,
+};
+#endif
 
 static struct rex_policy *to_policy(struct config_item *item)
 {
@@ -518,7 +531,15 @@ static int __init rex_init(void)
 	if (err)
 		return err;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
 	register_kfunc_btf_id_set(&prog_test_kfunc_list, &rex_kfunc_btf_set);
+#else
+	err = register_btf_kfunc_id_set(BPF_PROG_TYPE_XDP, &rex_kfunc_btf_set);
+	if (err < 0) {
+		configfs_unregister_subsystem(&rex_configfs);
+		return err;
+	}
+#endif
 
 	banner();
 	return 0;
@@ -526,7 +547,9 @@ static int __init rex_init(void)
 
 static void __exit rex_exit(void)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
 	unregister_kfunc_btf_id_set(&prog_test_kfunc_list, &rex_kfunc_btf_set);
+#endif
 	configfs_unregister_subsystem(&rex_configfs);
 	WARN_ON(!idr_is_empty(&rex_idr));
 	idr_destroy(&rex_idr);
