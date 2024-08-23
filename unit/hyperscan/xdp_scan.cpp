@@ -78,7 +78,7 @@ __wrap_hs_scan(const hs_database_t *db, const char *data, unsigned length,
         /* upload database to the kernel */
         std::ofstream dbf(cfg_path+"/database", std::ios::binary);
         dbf.write(regex, regex_len);
-        hs_misc_free(regex);
+        free(regex);
         dbf.close();
         GTEST_CHECK_(!!dbf);
 
