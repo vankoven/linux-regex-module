@@ -13,8 +13,12 @@ find_path(LIBBPF_INCLUDE_DIR
   NAMES bpf/bpf.h
   HINTS ${PC_LIBBPF_INCLUDE_DIRS}
   )
+
+# Prefer static library over the dynamic one: libbpf is normally static library,
+# but some systems doesn't provide that. make the build safe for developers
+# machines.
 find_library(LIBBPF_LIBRARY
-  NAMES bpf
+  NAMES libbpf.a bpf
   HINTS ${PC_LIBBPF_LIBRARY_DIRS}
   )
 

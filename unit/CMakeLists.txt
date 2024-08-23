@@ -75,10 +75,8 @@ endif()
 
 if (TEST_XDPSCAN)
 
+option(ZLIB_USE_STATIC_LIBS "" ON)
 find_package(LibBpf REQUIRED)
-if ("${LINUX_TOOLS_INCLUDE_DIR}" STREQUAL "")
-    message(FATAL_ERROR "Please set LINUX_TOOLS_INCLUDE_DIR")
-endif()
 
 set(unit_xdpscan_SOURCES
     ${gtest_SOURCES}
