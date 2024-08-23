@@ -230,3 +230,8 @@ else()
     )
     endif()
 endif()
+
+add_custom_target(
+    check
+    DEPENDS unit
+)
