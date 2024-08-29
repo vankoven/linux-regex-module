@@ -22,6 +22,10 @@
 #include <linux/btf_ids.h>
 #include <net/xdp.h>
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0)
+#error "Minimum supported kernel version is 6.2.0"
+#endif
+
 static ulong max_db_size = 4 << 20;
 module_param(max_db_size, ulong, 0644);
 MODULE_PARM_DESC(max_db_size, "Maximum size of configfs upload, default=4MB");
@@ -87,12 +91,9 @@ static int rex_scan_cb(unsigned int expression, unsigned long long from,
 
 	return (features & REX_SINGLE_SHOT) ? 1 : 0;
 }
-#if LINUX_VERSION_CODE > KERNEL_VERSION(6, 2, 0)
+
 __bpf_kfunc int bpf_scan_bytes(const void *buf, __u32 buf__sz,
 			       struct rex_scan_attr *attr)
-#else
-int bpf_scan_bytes(const void *buf, __u32 buf__sz, struct rex_scan_attr *attr)
-#endif
 {
 	struct rex_scan_ctx ctx = {
 		.attr = attr,
@@ -144,23 +145,6 @@ int bpf_scan_bytes(const void *buf, __u32 buf__sz, struct rex_scan_attr *attr)
 }
 EXPORT_SYMBOL(bpf_scan_bytes);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
-/* Based on code taken from net/core/filter.c */
-static void *bpf_xdp_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
-{
-	u32 size = xdp->data_end - xdp->data;
-	void *addr = xdp->data;
-
-	if (unlikely(offset > 0xffff || len > 0xffff))
-		return ERR_PTR(-EFAULT);
-
-	if (offset + len > size)
-		return ERR_PTR(-EINVAL);
-
-	return addr + offset;
-}
-#else
-/* This code is taken from net/core/filter.c */
 static void *bpf_xdp_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
 {
 	u32 size = xdp->data_end - xdp->data;
@@ -192,15 +176,9 @@ static void *bpf_xdp_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
 out:
 	return offset + len <= size ? addr + offset : NULL;
 }
-#endif
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(6, 2, 0)
 __bpf_kfunc int bpf_xdp_scan_bytes(const struct xdp_md *xdp_md, u32 offset,
 				   u32 len, struct rex_scan_attr *scan_attr)
-#else
-int bpf_xdp_scan_bytes(const struct xdp_md *xdp_md, u32 offset, u32 len,
-		       struct rex_scan_attr *scan_attr)
-#endif
 {
 	struct xdp_buff *xdp = (struct xdp_buff *)xdp_md;
 	void *ptr = bpf_xdp_pointer(xdp, offset, len);
@@ -215,13 +193,6 @@ int bpf_xdp_scan_bytes(const struct xdp_md *xdp_md, u32 offset, u32 len,
 }
 EXPORT_SYMBOL(bpf_xdp_scan_bytes);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
-BTF_SET_START(rex_kfunc_ids)
-BTF_ID(func, bpf_scan_bytes)
-BTF_ID(func, bpf_xdp_scan_bytes)
-BTF_SET_END(rex_kfunc_ids)
-static DEFINE_KFUNC_BTF_ID_SET(&rex_kfunc_ids, rex_kfunc_btf_set);
-#else
 
 BTF_SET8_START(rex_kfunc_ids)
 BTF_ID_FLAGS(func, bpf_scan_bytes)
@@ -232,7 +203,6 @@ static const struct btf_kfunc_id_set rex_kfunc_btf_set = {
 	.owner = THIS_MODULE,
 	.set = &rex_kfunc_ids,
 };
-#endif
 
 static struct rex_policy *to_policy(struct config_item *item)
 {
@@ -556,15 +526,11 @@ static int __init rex_init(void)
 	if (err)
 		return err;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
-	register_kfunc_btf_id_set(&prog_test_kfunc_list, &rex_kfunc_btf_set);
-#else
 	err = register_btf_kfunc_id_set(BPF_PROG_TYPE_XDP, &rex_kfunc_btf_set);
 	if (err < 0) {
 		configfs_unregister_subsystem(&rex_configfs);
 		return err;
 	}
-#endif
 
 	banner();
 	return 0;
@@ -572,9 +538,6 @@ static int __init rex_init(void)
 
 static void __exit rex_exit(void)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
-	unregister_kfunc_btf_id_set(&prog_test_kfunc_list, &rex_kfunc_btf_set);
-#endif
 	configfs_unregister_subsystem(&rex_configfs);
 	WARN_ON(!idr_is_empty(&rex_idr));
 	idr_destroy(&rex_idr);
@@ -584,6 +547,8 @@ module_init(rex_init);
 module_exit(rex_exit);
 
 /* Module information */
-MODULE_AUTHOR("Sergey Nizovtsev, sn@tempesta-tech.com");
+MODULE_AUTHOR("Sergey Nizovtsev <sn@tempesta-tech.com>");
+MODULE_AUTHOR("Ivan Koveshnikov <ivan.koveshnikov@gcore.com>");
+MODULE_AUTHOR("Dmitry Egorov <dmitry.egorov@gcore.com>");
 MODULE_DESCRIPTION("Hyperscan regex engine");
 MODULE_LICENSE("Dual BSD/GPL");
