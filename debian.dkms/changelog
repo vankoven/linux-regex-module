@@ -4,6 +4,7 @@ linux-rex (1.0) unstable; urgency=medium
   * More verbose information during importing databases
   * Update Hyperscan to release 5.4.2
   * Vanilla Kernel version support does not need preempt protection for FPU
+  * Fixed module build on Kernel v6.5+
 
  -- Ivan Koveshnikov <ivan.koveshnikov@gcore.com>  Mon, 15 Apr 2024 22:30:11 +0100
 
