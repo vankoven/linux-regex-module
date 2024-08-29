@@ -146,7 +146,7 @@ EXPORT_SYMBOL(bpf_scan_bytes);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
 /* Based on code taken from net/core/filter.c */
-static void *bpf_xdp_pointer(const struct xdp_buff *xdp, u32 offset, u32 len)
+static void *bpf_xdp_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
 {
 	u32 size = xdp->data_end - xdp->data;
 	void *addr = xdp->data;
@@ -161,12 +161,11 @@ static void *bpf_xdp_pointer(const struct xdp_buff *xdp, u32 offset, u32 len)
 }
 #else
 /* This code is taken from net/core/filter.c */
-static void *bpf_xdp_pointer(const struct xdp_buff *xdp, u32 offset, u32 len)
+static void *bpf_xdp_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
 {
 	u32 size = xdp->data_end - xdp->data;
 	struct skb_shared_info *sinfo;
 	void *addr = xdp->data;
-	struct skb_shared_info *sinfo = xdp_get_shared_info_from_buff(xdp);
 	int i;
 
 	if (unlikely(offset > 0xffff || len > 0xffff))
