@@ -22,8 +22,6 @@ override_dh_auto_configure:
 	dh_auto_configure -- \
 		-DBUILD_STATIC_AND_SHARED=1 \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
-		-DBUILD_AVX512=on \
-		-DBUILD_AVX512VBMI=on \
 		-DTEST_XDPSCAN=ON
 
 override_dh_missing:
