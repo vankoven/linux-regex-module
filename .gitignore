@@ -9,6 +9,7 @@
 autom4te.cache
 autojunk
 .dirstamp
+.vscode
 
 # Temp and swap files
 *~
@@ -118,3 +119,6 @@ obj-x86_64-linux-gnu/
 
 #VScode
 .vscode
+
+# Used for github actions
+debian

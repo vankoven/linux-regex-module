@@ -87,8 +87,12 @@ static int rex_scan_cb(unsigned int expression, unsigned long long from,
 
 	return (features & REX_SINGLE_SHOT) ? 1 : 0;
 }
-
+#if LINUX_VERSION_CODE > KERNEL_VERSION(6, 2, 0)
+__bpf_kfunc int bpf_scan_bytes(const void *buf, __u32 buf__sz,
+			       struct rex_scan_attr *attr)
+#else
 int bpf_scan_bytes(const void *buf, __u32 buf__sz, struct rex_scan_attr *attr)
+#endif
 {
 	struct rex_scan_ctx ctx = {
 		.attr = attr,
@@ -119,8 +123,8 @@ int bpf_scan_bytes(const void *buf, __u32 buf__sz, struct rex_scan_attr *attr)
 		return -EBUSY;
 
 	kernel_fpu_begin();
-	err = hs_scan(patterns(db), buf, buf__sz, 0, scratch,
-				rex_scan_cb, &ctx);
+	err = hs_scan(patterns(db), buf, buf__sz, 0, scratch, rex_scan_cb,
+		      &ctx);
 	kernel_fpu_end();
 
 	switch (err) {
@@ -191,8 +195,13 @@ out:
 }
 #endif
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(6, 2, 0)
+__bpf_kfunc int bpf_xdp_scan_bytes(const struct xdp_md *xdp_md, u32 offset,
+				   u32 len, struct rex_scan_attr *scan_attr)
+#else
 int bpf_xdp_scan_bytes(const struct xdp_md *xdp_md, u32 offset, u32 len,
 		       struct rex_scan_attr *scan_attr)
+#endif
 {
 	struct xdp_buff *xdp = (struct xdp_buff *)xdp_md;
 	void *ptr = bpf_xdp_pointer(xdp, offset, len);
@@ -221,8 +230,8 @@ BTF_ID_FLAGS(func, bpf_xdp_scan_bytes)
 BTF_SET8_END(rex_kfunc_ids)
 
 static const struct btf_kfunc_id_set rex_kfunc_btf_set = {
-	.owner	= THIS_MODULE,
-	.set	= &rex_kfunc_ids,
+	.owner = THIS_MODULE,
+	.set = &rex_kfunc_ids,
 };
 #endif
 
