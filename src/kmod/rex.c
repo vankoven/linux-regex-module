@@ -100,10 +100,10 @@ __bpf_kfunc int bpf_scan_bytes(const void *buf, __u32 buf__sz,
 		.block = buf,
 		.block_len = buf__sz,
 	};
-	struct rex_policy *rex;
-	struct rex_database *db;
-	hs_scratch_t *scratch;
 	hs_error_t err = HS_UNKNOWN_ERROR;
+	struct rex_database *db;
+	struct rex_policy *rex;
+	hs_scratch_t *scratch;
 
 	WARN_ON_ONCE(!rcu_read_lock_held() && !rcu_read_lock_bh_held());
 
@@ -266,11 +266,11 @@ static ssize_t rexcfg_database_write(struct config_item *item,
 				     const void *bytes, size_t nbytes)
 {
 	struct rex_policy *rex = to_policy(item);
-	struct rex_database *db;
 	hs_scratch_t *proto = NULL;
+	struct rex_database *db;
 	size_t alloc_size = 0;
-	int cpu, r;
 	char *info = NULL;
+	int cpu, r;
 
 	/* Drop existing database on empty write. */
 	if (nbytes == 0) {
