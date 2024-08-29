@@ -1,0 +1,202 @@
+name: Build package
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build_dkms:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install dependencies
+        run: |
+          sudo apt update
+          sudo apt install dpkg-dev debhelper dkms
+
+      - name: prepare sources
+        run: |
+          rm -rf debian
+          cp -r debian.dkms debian
+
+      - name: make dkms source package
+        run: |
+          fakeroot debian/rules binary
+          mv ../rex-dkms*_all.deb .
+
+      - name: upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dkms_package
+          path: rex-dkms*_all.deb
+          if-no-files-found: error
+
+      # The package contains only sources. Let's check that it's buildable,
+      # and no surprising errors apeear in the build log.
+
+      - name: build module with dkms
+        run: |
+          sudo apt-get install -y ./rex-dkms*_all.deb \
+          || ( find /var/lib/dkms -name make.log -exec cat '{}' \; && false )
+
+  # libbpf 1.3+ is required for functional tests
+  build_libbpf:
+    runs-on: ubuntu-22.04
+    steps:
+
+      - name: Restore cached libbpf
+        id: cache-libbpf
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            libbpf*.deb
+          key: ${{ runner.os }}-libbpf
+
+      - name: install dependencies
+        if: steps.cache-libbpf.outputs.cache-hit != 'true'
+        run: |
+          sudo apt update
+          sudo apt install dpkg-dev debhelper libelf-dev
+
+      - name: build package
+        if: steps.cache-libbpf.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/sudipm-mukherjee/libbpf
+          cd libbpf
+          dpkg-buildpackage -uc -us -b
+
+      - name: save libbpf
+        id: cache-libbpf-save
+        if: steps.cache-libbpf.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            libbpf*.deb
+          key: ${{ steps.cache-libbpf.outputs.cache-primary-key }}
+
+      - name: list build artifacts
+        run: |
+          ls -lah
+
+      - name: upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: libbpf
+          path: libbpf*.deb
+          if-no-files-found: error
+
+  build_library:
+    runs-on: ubuntu-22.04
+    needs: build_libbpf
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: prepare sources
+        run: |
+          rm -rf debian
+          cp -r debian.lib debian
+
+      - name: install dependencies
+        run: |
+          sudo apt update
+          sudo apt install  -y libpcap-dev cmake dpkg-dev debhelper libboost-dev po-debconf ragel libelf-dev
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: libbpf
+          path: libbpf
+
+      - name: install libbpf
+        run: |
+          cd libbpf
+          sudo dpkg -i ./libbpf-dev* ./libbpf1_*
+
+      # Compiling Hyperscan with unlimited jobs may hang. Don't let it overcome
+      # cpu constraints.
+      - run: |
+          echo "nproc=$(nproc)" >> $GITHUB_ENV
+
+      - name: build package
+        run: |
+          dpkg-buildpackage -j${{env.nproc}} -b --no-sign
+
+      - name: copy build artifacts
+        run: |
+          mv ../libhyperscan*.deb .
+
+      - name: upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyperscan-lib
+          path: libhyperscan*deb
+          if-no-files-found: error
+
+      - name: upload func test artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: func_tester
+          path: obj-x86_64-linux-gnu/bin/unit-xdpscan
+          if-no-files-found: error
+
+  functional_test:
+    runs-on: ubuntu-22.04
+    needs: [build_library, build_dkms]
+    steps:
+
+      - name: install dependencies
+        run: |
+          sudo apt update
+          sudo apt install dkms
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dkms_package
+      - uses: actions/download-artifact@v4
+        with:
+          name: func_tester
+      - uses: actions/download-artifact@v4
+        with:
+          name: hyperscan-lib
+
+      - name: install hyperscan library
+        run: |
+          sudo apt install -y ./libhyperscan*deb
+
+      - name: build module with dkms
+        run: |
+          sudo apt-get install -y ./rex-dkms*_all.deb \
+          || ( find /var/lib/dkms -name make.log -exec cat '{}' \; && false )
+
+      - name: load module
+        run: |
+          sudo modprobe xdp_rex
+
+      - name: run tests
+        run: |
+          chmod +x unit-xdpscan
+          sudo ./unit-xdpscan
+
+  make_release:
+    runs-on: ubuntu-22.04
+    needs: functional_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dkms_package
+      - uses: actions/download-artifact@v4
+        with:
+          name: hyperscan-lib
+
+      - name: changelog
+        run: |
+          awk '/^ --/ {exit} {print}' debian.dkms/changelog >> release_log.txt
+          echo "\n" >> release_log.txt
+          awk '/^ --/ {exit} {print}' debian.lib/changelog >> release_log.txt
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: "*.deb"
+          body_path: release_log.txt

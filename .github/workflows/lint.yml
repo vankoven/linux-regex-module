@@ -1,0 +1,30 @@
+name: Lint
+on: [push]
+jobs:
+  check-kernel-module:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install dependencies
+        run: |
+          sudo apt update
+          sudo apt install codespell coccinelle
+
+      - name: checkpatch
+        shell: bash
+        run: |
+          cd /lib/modules/$(uname -r)/build
+          sudo touch COPYING CREDITS MAINTAINERS README
+          scripts/checkpatch.pl --ignore \
+            LINUX_VERSION_CODE,CONSTANT_COMPARISON \
+            -f ${GITHUB_WORKSPACE}/src/kmod/{rex.c,rex.h,rex_trace.h} \
+            --codespell --codespellfile \
+            /usr/lib/python3/dist-packages/codespell_lib/data/dictionary.txt
+
+      - name: coccicheck
+        run: |
+          make -C /lib/modules/$(uname -r)/build \
+            C=2 CHECK=scripts/coccicheck \
+            M=$PWD/src MODE=report \
+            -j$(nproc) kmod/rex.o
