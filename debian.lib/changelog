@@ -1,3 +1,15 @@
+hyperscan (5.4.2-1+kernel-module) unstable; urgency=medium
+
+  * Enable unit tests in the CI builds
+  * Add ExpressionLib to the package as it is required for loading
+    databases into the kernel
+  * Disable AVX512 support, since the kernel runtime is set to not use it.
+    Otherwise the databases are compiled with the AVX512 and can't be
+    loaded into the kernel.
+  * Set Gcore as maintainers of this fork
+
+ -- Ivan Koveshnikov <ivan.koveshnikov@gcore.com>  Mon, 15 Apr 2024 22:30:11 +0100
+
 hyperscan (5.4.2-1) unstable; urgency=medium
 
   * Fix debian/watch for new github api
