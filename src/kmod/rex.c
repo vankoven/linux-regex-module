@@ -145,7 +145,7 @@ __bpf_kfunc int bpf_scan_bytes(const void *buf, __u32 buf__sz,
 }
 EXPORT_SYMBOL(bpf_scan_bytes);
 
-static void *bpf_xdp_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
+void *bpf_xdp_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
 {
 	u32 size = xdp->data_end - xdp->data;
 	struct skb_shared_info *sinfo;
