@@ -1,5 +1,5 @@
-/* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
-/* SPDX-FileCopyrightText: Copyright 2022 G-Core Labs S.A. */
+// SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
+// SPDX-FileCopyrightText: Copyright 2022 G-Core Labs S.A.
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
@@ -501,15 +501,13 @@ static const struct config_item_type rex_group_type = {
 };
 
 static struct configfs_subsystem rex_configfs = {
-    .su_mutex = __MUTEX_INITIALIZER(rex_configfs.su_mutex),
-    .su_group =
-        {
-            .cg_item =
-                {
-                    .ci_namebuf = "rex",
-                    .ci_type = &rex_group_type,
-                },
-        },
+	.su_mutex		= __MUTEX_INITIALIZER(rex_configfs.su_mutex),
+	.su_group		= {
+		.cg_item	= {
+			.ci_namebuf	= "rex",
+			.ci_type	= &rex_group_type,
+		},
+	},
 };
 
 static void banner(void)
