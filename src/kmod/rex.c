@@ -411,7 +411,7 @@ static ssize_t rexcfg_note_store(struct config_item *item, const char *str,
 	struct rex_policy *rex = to_policy(item);
 
 	mutex_lock(&rex->lock);
-	strncpy(rex->note, str, length);
+	strscpy_pad(rex->note, str, sizeof(rex->note));
 	mutex_unlock(&rex->lock);
 
 	return length;
