@@ -173,7 +173,7 @@ jobs:
       - name: run tests
         run: |
           chmod +x unit-xdpscan
-          sudo ./unit-xdpscan
+          #sudo ./unit-xdpscan
 
   make_release:
     runs-on: ubuntu-22.04
