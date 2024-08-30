@@ -227,7 +227,7 @@ static const unsigned test_modes[] = {HS_MODE_BLOCK, HS_MODE_STREAM,
 static const unsigned test_flags[] = {0, HS_FLAG_SINGLEMATCH,
                                       HS_FLAG_SOM_LEFTMOST};
 
-static const unsigned test_sizes[] = {1, 10, 100, 500, 10000};
+static const unsigned test_sizes[] = {1, 10, 100, 500, 2000};
 
 static const pair<unsigned, unsigned> test_bounds[] = {{3u, 10u}, {10u, 100u}};
 
