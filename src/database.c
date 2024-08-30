@@ -395,9 +395,11 @@ hs_error_t print_database_string(char **s, u32 version, const platform_t plat,
         mode = "STREAM";
     } else if (raw_mode == HS_MODE_VECTORED) {
         mode = "VECTORED";
-    } else {
-        assert(raw_mode == HS_MODE_BLOCK);
+    } else if (raw_mode == HS_MODE_BLOCK) {
         mode = "BLOCK";
+    }
+    else {
+        mode = "INVALID";
     }
 
     // Initial allocation size, which should be large enough to print our info.
