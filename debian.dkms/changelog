@@ -1,6 +1,6 @@
 linux-rex (1.0) unstable; urgency=medium
 
-  * Port to kernels 6.1+
+  * Port to kernels 6.2+
   * More verbose information during importing databases
   * Update Hyperscan to release 5.4.2
   * Vanilla Kernel version support does not need preempt protection for FPU
