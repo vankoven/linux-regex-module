@@ -20,9 +20,12 @@ override_dh_auto_test:
 
 override_dh_auto_configure:
 	dh_auto_configure -- \
-		-DBUILD_STATIC_AND_SHARED=1 \
+		-DBUILD_SHARED_LIBS=OFF \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DTEST_XDPSCAN=ON
+
+override_dh_auto_install:
+	dh_auto_install --destdir=debian/tmp
 
 override_dh_missing:
 	dh_missing --fail-missing

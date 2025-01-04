@@ -19,26 +19,10 @@ Vcs-Browser: <https://github.com/G-Core/linux-regex-module>
 Package: libhyperscan-dev
 Section: libdevel
 Architecture: any-amd64 i386 kfreebsd-i386
-Depends: libhyperscan5 (= ${binary:Version}), ${misc:Depends}
+Depends: ${misc:Depends}
 Description: Development files for the Hyperscan library
  This package contains development libraries, header files and documentation for
  the regular expression matching library libhyperscan. You can either use the
  supplied shared or static library.
- .
- libhyperscan only runs on processors with at least SSSE3 support.
-
-Package: libhyperscan5
-Architecture: any-amd64 i386 kfreebsd-i386
-Depends: ${misc:Depends}, ${shlibs:Depends}
-Pre-Depends: debconf
-Conflicts: libhyperscan4 (>= 5)
-Replaces: libhyperscan4 (>= 5)
-Description: High-performance regular expression matching library
- Hyperscan is a high-performance multiple regex matching library.
- It follows the regular expression syntax of the commonly-used libpcre library,
- but is a standalone library with its own C API. Hyperscan uses hybrid automata
- techniques to allow simultaneous matching of large numbers (up to tens of
- thousands) of regular expressions and for the matching of regular expressions
- across streams of data. Hyperscan is typically used in a DPI library stack.
  .
  libhyperscan only runs on processors with at least SSSE3 support.
